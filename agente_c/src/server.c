@@ -1,0 +1,557 @@
+#include "include/server.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <fcntl.h>
+#include <errno.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+#include <pthread.h>
+
+/**
+ * Dentro de handle_tcp_read, luego de cambiar (\n) por (\0).
+ * Debe decidir qué hacer con el mensaje, si RESERVE, RELEASE, etc.
+ */
+extern void process_message(connection_t *conn, char *msg);
+
+
+/**
+ * Dentro de handle_udp_read, por cada datagrama que llega al socket UDP.
+ * Para agregarlo a los conocidos.
+ */
+extern void process_announce(const char *ip_sender, const char *message);
+
+/**
+ * O_NONBLOCK para que retorne automáticamente y no se bloquee
+ * EAGAIN o EWOULDBLOCK
+ */
+static void set_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl F_GETFL");
+        exit(EXIT_FAILURE);
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl F_SETFL");
+        exit(EXIT_FAILURE);
+    }
+}
+
+// Crea un socket, lo bindea, lo pone en listen (si es TCP) y lo agrega a epoll
+static connection_t* create_listen_socket(int epfd, const char* ip, int port, connection_type_t type, int is_udp) {
+    // Crea fd de INET (No local), y setea tcp o udp según vaya
+    int fd = socket(AF_INET, is_udp ? SOCK_DGRAM : SOCK_STREAM, 0);
+    if (fd < 0) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // SO_REUSEADDR evita el error "Address already in use" al reiniciar el servidor rápidamente
+    int opt = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr)); // inicializa a 0
+    addr.sin_family = AF_INET; // Por INET
+    addr.sin_port = htons(port); 
+    inet_pton(AF_INET, ip, &addr.sin_addr);
+
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+
+    // Solo los sockets TCP requieren listen()
+    if (!is_udp) {
+        if (listen(fd, SOMAXCONN) < 0) {
+            perror("listen");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    set_nonblocking(fd);
+
+    // Alocamos la estructura en el heap para que persista
+    connection_t *conn = malloc(sizeof(connection_t));
+    if (!conn) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
+    conn->fd = fd;
+    conn->type = type;
+    conn->read_pos = 0;
+    conn->write_pos = 0;
+    conn->write_len = 0;
+
+    // Registramos el evento de lectura (EPOLLIN) asociando el puntero de la estructura
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLEXCLUSIVE; 
+    ev.data.ptr = conn;
+    
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0) {
+        perror("epoll_ctl");
+        exit(EXIT_FAILURE);
+    }
+
+    return conn;
+}
+
+int connect_remote_node(int epfd, const char *ip, int port) {
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("socket saliente");
+        return -1;
+    }
+
+    set_nonblocking(sockfd);
+
+    struct sockaddr_in remote_addr;
+    memset(&remote_addr, 0, sizeof(remote_addr));
+    remote_addr.sin_family = AF_INET;
+    remote_addr.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &remote_addr.sin_addr);
+
+    /* connect() sobre un socket no bloqueante retornará inmediatamente.
+     * Si la conexión es a localhost, puede retornar 0.
+     * Para red externa, retornará -1 con errno == EINPROGRESS.
+     */
+    int res = connect(sockfd, (struct sockaddr*)&remote_addr, sizeof(remote_addr));
+    
+    if (res < 0 && errno != EINPROGRESS) {
+        perror("connect saliente");
+        close(sockfd);
+        return -1;
+    }
+
+    connection_t *conn = malloc(sizeof(connection_t));
+    if (!conn) {
+        perror("malloc conn saliente");
+        close(sockfd);
+        return -1;
+    }
+
+    conn->fd = sockfd;
+    conn->type = CONN_TCP_OUTGOING;
+    conn->read_pos = 0;
+    conn->write_pos = 0;
+    conn->write_len = 0;
+
+    struct epoll_event ev;
+    /* Se espera EPOLLOUT para confirmar que el handshake finalizó.
+     * EPOLLONESHOT garantiza exclusión mutua en el event loop multihilo.
+     */
+    ev.events = EPOLLOUT | EPOLLONESHOT;
+    ev.data.ptr = conn;
+
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
+        perror("epoll_ctl saliente");
+        close(sockfd);
+        free(conn);
+        return -1;
+    }
+
+    return sockfd;
+}
+
+static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
+    int socket_error = 0;
+    socklen_t errlen = sizeof(socket_error);
+
+    if (getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &socket_error, &errlen) < 0) {
+        perror("getsockopt SO_ERROR");
+        close(conn->fd);
+        free(conn);
+        return;
+    }
+
+    if (socket_error != 0) {
+        // La conexión asíncrona falló (ej. ECONNREFUSED)
+        fprintf(stderr, "Fallo al conectar nodo remoto: %s\n", strerror(socket_error));
+        close(conn->fd);
+        free(conn);
+        return;
+    }
+
+    /* La conexión fue exitosa. 
+     * Se debe reconfigurar el evento en epoll para operar de forma regular
+     * esperando lecturas (EPOLLIN) para recibir los GRANTED/DENIED.
+     */
+    conn->type = CONN_TCP_CLIENT_REMOTE; 
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLONESHOT;
+    ev.data.ptr = conn;
+
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+        perror("epoll_ctl mod connection success");
+        close(conn->fd);
+        free(conn);
+    }
+}
+
+
+static void handle_udp_read(connection_t *conn) {
+    char buffer[BUFF_SIZE];
+    struct sockaddr_in sender_addr;
+    socklen_t sender_len = sizeof(sender_addr);
+
+    /* Iteración estricta para procesar todos los datagramas encolados
+     * en el buffer de recepción del sistema operativo.
+     */
+    while (1) {
+        ssize_t bytes_read = recvfrom(conn->fd, buffer, BUFF_SIZE - 1, 0, 
+                                      (struct sockaddr*)&sender_addr, &sender_len);
+
+        if (bytes_read < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Buffer vacío. Fin del procesamiento.
+                break;
+            } else {
+                perror("recvfrom UDP error");
+                break;
+            }
+        }
+
+        buffer[bytes_read] = '\0'; // Terminación nula para procesar como string C
+
+        // Extracción de la IP de origen para mantener la tabla de nodos
+        char sender_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(sender_addr.sin_addr), sender_ip, INET_ADDRSTRLEN);
+
+        // Se delega el parseo del formato "ANNOUNCE <IP> <puerto> <recursos>"
+        process_announce(sender_ip, buffer);
+    }
+
+    /* Nota arquitectónica:
+     * Al usar EPOLLEXCLUSIVE en lugar de EPOLLONESHOT para este socket,
+     * no es necesario rearmarlo con epoll_ctl. El socket sigue escuchando
+     * y el kernel gestionará los bloqueos correctamente.
+     */
+}
+
+
+
+static void handle_tcp_read(int epfd, connection_t *conn) {
+    int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
+
+    if (bytes_read < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            /** 
+             * No hay más datos por leer en el buffer del socket del OS.
+             * Debido a EPOLLONESHOT, es obligatorio reactivar el descriptor
+             * para volver a recibir eventos de este cliente.
+             */
+            struct epoll_event ev;
+            ev.events = EPOLLIN | EPOLLONESHOT;
+            ev.data.ptr = conn;
+            if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+                perror("epoll_ctl mod EAGAIN");
+                close(conn->fd);
+                free(conn);
+            }
+            return;
+        } else {
+            // Error real de E/S
+            perror("read error");
+            close(conn->fd);
+            free(conn);
+            return;
+        }
+    }
+
+    if (bytes_read == 0) {
+        /* EOF: El extremo remoto cerró la conexión de manera ordenada */
+        close(conn->fd);
+        free(conn);
+        return;
+    }
+
+    // Se actualiza el puntero lógico del buffer
+    conn->read_pos += bytes_read;
+    conn->read_buf[conn->read_pos] = '\0'; 
+
+    char *line_start = conn->read_buf;
+    char *newline_pos;
+
+    /** 
+     * Extracción iterativa: TCP es un flujo de bytes, no de mensajes.
+     * Un único read() puede retornar múltiples mensajes concatenados
+     * (ej: "RESERVE 1001 cpu 1\nRELEASE 1002 mem 10\n").
+     */
+    while ((newline_pos = strchr(line_start, '\n')) != NULL) {
+        *newline_pos = '\0'; // Mutar el '\n' para crear una string válida en C
+        
+        // Llamada a la capa de aplicación
+        process_message(conn, line_start);
+
+        line_start = newline_pos + 1;
+    }
+
+    /** 
+     * Compactación del buffer: Si quedaron bytes de un mensaje incompleto
+     * al final del buffer, se desplazan al inicio para concatenarlos
+     * con la próxima lectura.
+     */
+    size_t remaining = (conn->read_buf + conn->read_pos) - line_start;
+    if (remaining > 0 && line_start > conn->read_buf) {
+        memmove(conn->read_buf, line_start, remaining);
+    }
+    conn->read_pos = remaining;
+
+    /* Reactivación final del descriptor en epoll */
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLONESHOT;
+    ev.data.ptr = conn;
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+        perror("epoll_ctl mod rearm");
+        close(conn->fd);
+        free(conn);
+    }
+}
+
+static void handle_tcp_write(int epfd, connection_t *conn) {
+    // Calcula los bytes restantes por enviar
+    size_t pending_bytes = conn->write_len - conn->write_pos;
+    
+    ssize_t bytes_written = write(conn->fd, conn->write_buf + conn->write_pos, pending_bytes);
+
+    if (bytes_written < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            /* El buffer del socket está lleno. 
+             * Se rearma el descriptor esperando EPOLLOUT para reanudar luego.
+             */
+            struct epoll_event ev;
+            ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+            ev.data.ptr = conn;
+            if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+                perror("epoll_ctl mod EAGAIN write");
+                close(conn->fd);
+                free(conn);
+            }
+            return;
+        } else {
+            // Error de conexión (ej. EPIPE si el cliente cerró el socket prematuramente)
+            perror("write error");
+            close(conn->fd);
+            free(conn);
+            return;
+        }
+    }
+
+    // Actualizamos el puntero de la cantidad de bytes enviados
+    conn->write_pos += bytes_written;
+
+    struct epoll_event ev;
+    
+    if (conn->write_pos == conn->write_len) {
+        /* Buffer vaciado. 
+         * Es imperativo eliminar EPOLLOUT de la máscara de eventos.
+         * Si se mantiene EPOLLOUT sin tener datos pendientes, epoll_wait
+         * retornará inmediatamente en un bucle infinito (busy-waiting)
+         * porque el socket siempre está listo para escribir.
+         */
+        conn->write_pos = 0;
+        conn->write_len = 0;
+        ev.events = EPOLLIN | EPOLLONESHOT;
+    } else {
+        /* Aún quedan bytes por enviar. Se mantiene EPOLLOUT. */
+        ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+    }
+
+    ev.data.ptr = conn;
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+        perror("epoll_ctl mod write update");
+        close(conn->fd);
+        free(conn);
+    }
+}
+
+static void handle_accept(int epfd, connection_t *listen_conn) {
+    /** 
+     * Se itera sobre accept() hasta que retorne EAGAIN. 
+     * Esto es fundamental porque múltiples conexiones pueden haber ingresado 
+     * simultáneamente en la cola del kernel antes de que el hilo despierte.
+     */
+    while (1) {
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        
+        int client_fd = accept(listen_conn->fd, (struct sockaddr *)&client_addr, &client_len);
+        
+        if (client_fd == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Se vació la cola de conexiones pendientes
+                break;
+            } else {
+                perror("accept");
+                break;
+            }
+        }
+
+        set_nonblocking(client_fd);
+
+        connection_t *new_conn = malloc(sizeof(connection_t));
+        if (!new_conn) {
+            perror("malloc new_conn");
+            close(client_fd);
+            continue;
+        }
+
+        new_conn->fd = client_fd;
+        new_conn->read_pos = 0;
+        new_conn->write_pos = 0;
+        new_conn->write_len = 0;
+
+        // Derivación del tipo de conexión según el socket de origen
+        if (listen_conn->type == CONN_TCP_PUBLIC_LISTEN) {
+            new_conn->type = CONN_TCP_CLIENT_REMOTE;
+        } else if (listen_conn->type == CONN_TCP_LOCAL_LISTEN) {
+            new_conn->type = CONN_TCP_CLIENT_LOCAL;
+        }
+
+        struct epoll_event ev;
+        /* * EPOLLONESHOT es imperativo aquí para concurrencia multihilo.
+         * Garantiza que, una vez que epoll notifique actividad en este socket,
+         * lo deshabilitará automáticamente hasta que el hilo termine de procesarlo
+         * y ejecute epoll_ctl(EPOLL_CTL_MOD).
+         */
+        ev.events = EPOLLIN | EPOLLONESHOT;
+        ev.data.ptr = new_conn;
+
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
+            perror("epoll_ctl add client");
+            close(client_fd);
+            free(new_conn);
+        }
+    }
+}
+
+// wait_for_clients - ish
+void* worker_thread_loop(void* arg) {
+    int epfd = *(int*)arg;
+    struct epoll_event events[MAX_EVENTS];
+
+    while (1) {
+        // Bloquea el hilo hasta que haya actividad en algún file descriptor
+        int nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
+        
+        if (nfds == -1) {
+            // EINTR significa que epoll_wait fue interrumpido por una señal del sistema. Es seguro reintentar.
+            if (errno == EINTR) continue; 
+            
+            perror("epoll_wait");
+            pthread_exit(NULL);
+        }
+
+        for (int i = 0; i < nfds; i++) {
+            connection_t *conn = (connection_t *)events[i].data.ptr;
+
+            // Tratamiento de errores en el socket (cierre abrupto, reset)
+            if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & (EPOLLIN | EPOLLOUT)))) {
+                fprintf(stderr, "Error en el socket %d\n", conn->fd);
+                close(conn->fd);
+                free(conn);
+                continue;
+            }
+
+            // Evento de lectura disponible
+            if (events[i].events & EPOLLIN) {
+                switch (conn->type) {
+                    case CONN_TCP_PUBLIC_LISTEN:
+                    case CONN_TCP_LOCAL_LISTEN:
+                        // Nuevas conexiones entrantes
+                        handle_accept(epfd, conn);
+                        break;
+                        
+                    case CONN_UDP_DISCOVERY:
+                        // Paquetes de descubrimiento de otros nodos
+                        handle_udp_read(conn);
+                        break;
+                        
+                    case CONN_TCP_CLIENT_REMOTE:
+                    case CONN_TCP_CLIENT_LOCAL:
+                    case CONN_TCP_OUTGOING:
+                        // Datos provenientes de un agente remoto o del planificador Erlang local
+                        handle_tcp_read(epfd, conn);
+                        break;
+                }
+            }
+
+            // Evento de escritura disponible (el buffer del socket del OS tiene espacio)
+            if (events[i].events & EPOLLOUT) {
+                switch (conn->type) {
+                    case CONN_TCP_CLIENT_REMOTE:
+                    case CONN_TCP_CLIENT_LOCAL:
+                    case CONN_TCP_OUTGOING:
+                        handle_tcp_write(epfd, conn);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
+
+    *epfd = epoll_create1(0);
+    if (*epfd < 0) {
+        perror("epoll_create1");
+        return -1;
+    }
+    
+    // TCP Público (Agentes C)
+    create_listen_socket(*epfd, public_ip, tcp_port, CONN_TCP_PUBLIC_LISTEN, 0);
+    
+    // TCP Local (Erlang)
+    create_listen_socket(*epfd, "127.0.0.1", tcp_port, CONN_TCP_LOCAL_LISTEN, 0);
+    
+    // UDP Broadcast (Descubrimiento) con 0.0.0.0 (INADDR_ANY)
+    create_listen_socket(*epfd, "0.0.0.0", UDP_DISCOVERY_PORT, CONN_UDP_DISCOVERY, 1);
+
+    return 0;
+}
+
+void enqueue_write(int epfd, connection_t *conn, const char *msg) {
+    size_t msg_len = strlen(msg);
+
+    /* En un entorno multihilo real, esta modificación del buffer
+     * requeriría protección con un mutex dentro de connection_t,
+     * dado que el hilo del Resource Manager podría llamar a enqueue_write
+     * simultáneamente mientras un hilo de epoll ejecuta handle_tcp_write.
+     */
+     
+    // Verificación de capacidad (omitiendo realloc dinámico para simplificar)
+    if (conn->write_len + msg_len >= BUFF_SIZE) {
+        fprintf(stderr, "Error: Buffer de escritura lleno para fd %d\n", conn->fd);
+        return;
+    }
+
+    // Copiar el nuevo mensaje al final del buffer existente
+    memcpy(conn->write_buf + conn->write_len, msg, msg_len);
+    conn->write_len += msg_len;
+
+    /* Forzar la activación de EPOLLOUT en el kernel.
+     * Al agregar EPOLLOUT, el hilo despertará en la próxima iteración
+     * de epoll_wait e invocará handle_tcp_write.
+     */
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+    ev.data.ptr = conn;
+    
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+        perror("epoll_ctl mod enqueue_write");
+    }
+}
+
