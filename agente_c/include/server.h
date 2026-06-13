@@ -34,6 +34,7 @@ typedef struct {
     size_t read_pos;
     
     // Buffer para escrituras parciales
+    // mutex, a implementar
     char write_buf[BUFF_SIZE];
     size_t write_pos;
     size_t write_len;

@@ -1,4 +1,4 @@
-#include "include/server.h"
+#include "../include/server.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -250,7 +250,7 @@ static void handle_udp_read(connection_t *conn) {
      */
 }
 
-static void handle_tcp_read(int epfd, connection_t *conn) {
+static int handle_tcp_read(int epfd, connection_t *conn) {
     int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
 
     if (bytes_read < 0) {
@@ -268,13 +268,13 @@ static void handle_tcp_read(int epfd, connection_t *conn) {
                 close(conn->fd);
                 free(conn);
             }
-            return;
+            return 0;
         } else {
             // Error real de E/S
             perror("read error");
             close(conn->fd);
             free(conn);
-            return;
+            return 1;
         }
     }
 
@@ -284,7 +284,7 @@ static void handle_tcp_read(int epfd, connection_t *conn) {
         process_disconnect(conn);
         close(conn->fd);
         free(conn);
-        return;
+        return -1;
     }
 
     // Se actualiza el puntero lógico del buffer
@@ -321,13 +321,20 @@ static void handle_tcp_read(int epfd, connection_t *conn) {
 
     /* Reactivación final del descriptor en epoll */
     struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLONESHOT;
+    if (conn->write_len > 0) {
+        ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+    } else {
+        ev.events = EPOLLIN | EPOLLONESHOT;
+    }
+    
     ev.data.ptr = conn;
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod rearm");
         close(conn->fd);
         free(conn);
     }
+
+    return 0;
 }
 
 static void handle_tcp_write(int epfd, connection_t *conn) {
@@ -396,7 +403,7 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         
-        int client_fd = accept(listen_conn->fd, &client_addr, &client_len);
+        int client_fd = accept(listen_conn->fd, (struct sockaddr *)&client_addr, &client_len);
         
         if (client_fd == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -464,6 +471,7 @@ void* worker_thread_loop(void* arg) {
 
         for (int i = 0; i < nfds; i++) {
             connection_t *conn = (connection_t *)events[i].data.ptr;
+            int connection_closed = 0;
 
             // Tratamiento de errores en el socket (cierre abrupto, reset)
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & (EPOLLIN | EPOLLOUT)))) {
@@ -492,13 +500,15 @@ void* worker_thread_loop(void* arg) {
                     case CONN_TCP_CLIENT_REMOTE:
                     case CONN_TCP_CLIENT_LOCAL:
                     case CONN_TCP_OUTGOING:
-                        handle_tcp_read(epfd, conn);
+                        if (handle_tcp_read(epfd, conn) == -1) {
+                            connection_closed = 1;
+                        }
                         break;
                 }
             }
 
             // Evento de escritura disponible (el buffer del socket del OS tiene espacio)
-            if (events[i].events & EPOLLOUT) {
+            if (!connection_closed && events[i].events & EPOLLOUT) {
                 switch (conn->type) {
                     case CONN_TCP_CLIENT_REMOTE:
                     case CONN_TCP_CLIENT_LOCAL:
@@ -548,12 +558,6 @@ int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
 
 void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     size_t msg_len = strlen(msg);
-
-    /* En un entorno multihilo real, esta modificación del buffer
-     * requeriría protección con un mutex dentro de connection_t,
-     * dado que el hilo del Resource Manager podría llamar a enqueue_write
-     * simultáneamente mientras un hilo de epoll ejecuta handle_tcp_write.
-     */
      
     // Verificación de capacidad (omitiendo realloc dinámico para simplificar)
     if (conn->write_len + msg_len >= BUFF_SIZE) {
@@ -569,6 +573,7 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
      * Al agregar EPOLLOUT, el hilo despertará en la próxima iteración
      * de epoll_wait e invocará handle_tcp_write.
      */
+    /*
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
     ev.data.ptr = conn;
@@ -576,6 +581,7 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod enqueue_write");
     }
+    */
 }
 
 void send_udp_broadcast(int port, const char *message) {
