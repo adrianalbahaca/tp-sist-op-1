@@ -33,8 +33,20 @@ extern void process_announce(const char *ip_sender, const char *message);
 extern void process_disconnect(connection_t *conn);
 
 /**
- * O_NONBLOCK para que retorne automáticamente y no se bloquee
- * EAGAIN o EWOULDBLOCK
+ * Se llama cuando un connect_remote_node finaliza con éxito.
+ * Acá el Gestor de Estado ya puede llamar a enqueue_write con sus peticiones.
+ */
+extern void process_connection_ready(connection_t *conn);
+
+/**
+ * Se llama si connect_remote_node falló (ej. el nodo B estaba apagado).
+ * El Gestor de Estado debe abortar su plan y quizás buscar otro nodo.
+ */
+extern void process_connection_failed(connection_t *conn);
+
+/**
+ * O_NONBLOCK para que retorne automáticamente y no se bloquee al hacer read, 
+ * write o accept (EAGAIN o EWOULDBLOCK)
  */
 static void set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -48,7 +60,7 @@ static void set_nonblocking(int fd) {
     }
 }
 
-// Crea un socket, lo bindea, lo pone en listen (si es TCP) y lo agrega a epoll
+/* Crea un socket, lo bindea, lo pone en listen (si es TCP) y lo agrega a epoll */
 static connection_t* create_listen_socket(int epfd, const char* ip, int port, connection_type_t type, int is_udp) {
     // Crea fd de INET (No local), y setea tcp o udp según vaya
     int fd = socket(AF_INET, is_udp ? SOCK_DGRAM : SOCK_STREAM, 0);
@@ -97,6 +109,7 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     conn->fd = fd;
     conn->type = type;
     conn->read_pos = 0;
+    pthread_mutex_init(&conn->write_mutex, NULL);
     conn->write_pos = 0;
     conn->write_len = 0;
 
@@ -107,18 +120,22 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0) {
         perror("epoll_ctl");
+        close(fd);
+        pthread_mutex_destroy(&conn->write_mutex);
+        free(conn);
         exit(EXIT_FAILURE);
     }
 
     return conn;
 }
 
-int connect_remote_node(int epfd, const char *ip, int port) {
+/* Inicia una conexión TCP saliente hacia un nodo remoto de forma asíncrona*/
+connection_t *connect_remote_node(int epfd, const char *ip, int port) {
     // Crea el socket
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         perror("socket saliente");
-        return -1;
+        return NULL;
     }
 
     set_nonblocking(sockfd);
@@ -140,19 +157,20 @@ int connect_remote_node(int epfd, const char *ip, int port) {
     if (res < 0 && errno != EINPROGRESS) {
         perror("connect saliente");
         close(sockfd);
-        return -1;
+        return NULL;
     }
 
     connection_t *conn = malloc(sizeof(connection_t));
     if (!conn) {
         perror("malloc conn saliente");
         close(sockfd);
-        return -1;
+        return NULL;
     }
 
     conn->fd = sockfd;
     conn->type = CONN_TCP_OUTGOING;
     conn->read_pos = 0;
+    pthread_mutex_init(&conn->write_mutex, NULL);
     conn->write_pos = 0;
     conn->write_len = 0;
 
@@ -167,20 +185,24 @@ int connect_remote_node(int epfd, const char *ip, int port) {
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
         perror("epoll_ctl saliente");
         close(sockfd);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
-        return -1;
+        return NULL;
     }
 
-    return sockfd;
+    return conn;
 }
 
+/* Evalúa el resultado de connect_remote_node, completando la conexión */
 static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
     int socket_error = 0;
     socklen_t errlen = sizeof(socket_error);
 
     if (getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &socket_error, &errlen) < 0) {
         perror("getsockopt SO_ERROR");
+        process_connection_failed(conn);
         close(conn->fd);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
         return;
     }
@@ -188,7 +210,9 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
     if (socket_error != 0) {
         // La conexión asíncrona falló (ej. ECONNREFUSED)
         fprintf(stderr, "Fallo al conectar nodo remoto: %s\n", strerror(socket_error));
+        process_connection_failed(conn);
         close(conn->fd);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
         return;
     }
@@ -207,16 +231,22 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod connection success");
         close(conn->fd);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
+        return;
     }
+
+    process_connection_ready(conn);
 }
 
+/* Consume los datagramas pendientes */
 static void handle_udp_read(connection_t *conn) {
     char buffer[BUFF_SIZE];
     struct sockaddr_in sender_addr;
     socklen_t sender_len = sizeof(sender_addr);
 
-    /* Iteración estricta para procesar todos los datagramas encolados
+    /**
+     * Iteración estricta para procesar todos los datagramas encolados
      * en el buffer de recepción del sistema operativo.
      */
     while (1) {
@@ -243,18 +273,20 @@ static void handle_udp_read(connection_t *conn) {
         process_announce(sender_ip, buffer);
     }
 
-    /* Nota arquitectónica:
+    /* Nota:
      * Al usar EPOLLEXCLUSIVE en lugar de EPOLLONESHOT para este socket,
      * no es necesario rearmarlo con epoll_ctl. El socket sigue escuchando
      * y el kernel gestionará los bloqueos correctamente.
      */
 }
 
+/* Lee los datos de la conexión TCP */
 static int handle_tcp_read(int epfd, connection_t *conn) {
     int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
 
     if (bytes_read < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            pthread_mutex_lock(&conn->write_mutex);
             /** 
              * No hay más datos por leer en el buffer del socket del OS.
              * Debido a EPOLLONESHOT, es obligatorio reactivar el descriptor
@@ -265,16 +297,23 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
             ev.data.ptr = conn;
             if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
                 perror("epoll_ctl mod EAGAIN");
+                pthread_mutex_unlock(&conn->write_mutex);
+                process_disconnect(conn);
                 close(conn->fd);
+                pthread_mutex_destroy(&conn->write_mutex);
                 free(conn);
+                return -1;
             }
+            pthread_mutex_unlock(&conn->write_mutex);
             return 0;
         } else {
             // Error real de E/S
             perror("read error");
+            process_disconnect(conn);
             close(conn->fd);
+            pthread_mutex_destroy(&conn->write_mutex);
             free(conn);
-            return 1;
+            return -1;
         }
     }
 
@@ -283,6 +322,7 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
         // NOTIFICACIÓN ANTES DE DESTRUIR
         process_disconnect(conn);
         close(conn->fd);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
         return -1;
     }
@@ -320,6 +360,7 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
     conn->read_pos = remaining;
 
     /* Reactivación final del descriptor en epoll */
+    pthread_mutex_lock(&conn->write_mutex);
     struct epoll_event ev;
     if (conn->write_len > 0) {
         ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
@@ -330,17 +371,30 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
     ev.data.ptr = conn;
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod rearm");
+        pthread_mutex_unlock(&conn->write_mutex);
+        process_disconnect(conn);
         close(conn->fd);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
+        return -1;
     }
-
+    pthread_mutex_unlock(&conn->write_mutex);
     return 0;
 }
 
+/* Transmitir los datos por la red */
 static void handle_tcp_write(int epfd, connection_t *conn) {
+    pthread_mutex_lock(&conn->write_mutex);
     // Calcula los bytes restantes por enviar
     size_t pending_bytes = conn->write_len - conn->write_pos;
-    
+
+    if (pending_bytes == 0) {
+        /* Salvaguarda lógica si epoll disparó un evento espurio */
+        struct epoll_event ev = { .events = EPOLLIN | EPOLLONESHOT, .data.ptr = conn };
+        epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev);
+        pthread_mutex_unlock(&conn->write_mutex);
+        return;
+    }
     ssize_t bytes_written = write(conn->fd, conn->write_buf + conn->write_pos, pending_bytes);
 
     if (bytes_written < 0) {
@@ -355,13 +409,19 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
             if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
                 perror("epoll_ctl mod EAGAIN write");
                 close(conn->fd);
+                pthread_mutex_unlock(&conn->write_mutex);
+                pthread_mutex_destroy(&conn->write_mutex);
                 free(conn);
+                return;
             }
+            pthread_mutex_unlock(&conn->write_mutex);
             return;
         } else {
             // Error de conexión (ej. EPIPE si el cliente cerró el socket prematuramente)
             perror("write error");
             close(conn->fd);
+            pthread_mutex_unlock(&conn->write_mutex);
+            pthread_mutex_destroy(&conn->write_mutex);
             free(conn);
             return;
         }
@@ -391,10 +451,14 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod write update");
         close(conn->fd);
+        pthread_mutex_unlock(&conn->write_mutex);
+        pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
     }
+    pthread_mutex_unlock(&conn->write_mutex);
 }
 
+/* Acepta todas las conexiones TCP entrantes en los listen sockets*/
 static void handle_accept(int epfd, connection_t *listen_conn) {
     /** 
      * Se itera sobre accept() hasta que retorne EAGAIN para limipiar todo el buffer
@@ -426,6 +490,7 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
 
         new_conn->fd = client_fd;
         new_conn->read_pos = 0;
+        pthread_mutex_init(&new_conn->write_mutex, NULL);
         new_conn->write_pos = 0;
         new_conn->write_len = 0;
 
@@ -447,6 +512,7 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
         if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
             perror("epoll_ctl add client");
             close(client_fd);
+            pthread_mutex_destroy(&new_conn->write_mutex);
             free(new_conn);
         }
     }
@@ -479,6 +545,7 @@ void* worker_thread_loop(void* arg) {
                 // NOTIFICACIÓN ANTES DE DESTRUIR
                 process_disconnect(conn);
                 close(conn->fd);
+                pthread_mutex_destroy(&conn->write_mutex);
                 free(conn);
                 continue;
             }
@@ -528,6 +595,7 @@ void* worker_thread_loop(void* arg) {
     return NULL;
 }
 
+/* Inicializa la estructura del agente */
 int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
 
     *epfd = epoll_create1(0);
@@ -559,9 +627,12 @@ int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
 void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     size_t msg_len = strlen(msg);
      
+    pthread_mutex_lock(&conn->write_mutex);
+
     // Verificación de capacidad (omitiendo realloc dinámico para simplificar)
     if (conn->write_len + msg_len >= BUFF_SIZE) {
         fprintf(stderr, "Error: Buffer de escritura lleno para fd %d\n", conn->fd);
+        pthread_mutex_unlock(&conn->write_mutex);
         return;
     }
 
@@ -573,7 +644,7 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
      * Al agregar EPOLLOUT, el hilo despertará en la próxima iteración
      * de epoll_wait e invocará handle_tcp_write.
      */
-    /*
+    
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
     ev.data.ptr = conn;
@@ -581,9 +652,11 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod enqueue_write");
     }
-    */
+    
+    pthread_mutex_unlock(&conn->write_mutex);
 }
 
+/* Emite un mensaje broadcast udp */
 void send_udp_broadcast(int port, const char *message) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) {

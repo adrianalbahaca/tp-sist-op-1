@@ -1,2 +1,2 @@
-/agente_c/main_local.c
-/agente_c/test_server
+*.o
+*.out

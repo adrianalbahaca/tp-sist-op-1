@@ -4,6 +4,7 @@
 #include <sys/epoll.h>
 #include <stddef.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 #define MAX_EVENTS 64
 #define BUFF_SIZE 1024
@@ -35,6 +36,7 @@ typedef struct {
     
     // Buffer para escrituras parciales
     // mutex, a implementar
+    pthread_mutex_t write_mutex;
     char write_buf[BUFF_SIZE];
     size_t write_pos;
     size_t write_len;
@@ -60,11 +62,12 @@ void *worker_thread_loop(void *arg); // int epfd
  * Cuando el planificador Erlang envía un Request, entonces se llamará a esta 
  * funcion para crear la conexión
  */
-int connect_remote_node(int epfd, const char *ip, int port);
+connection_t *connect_remote_node(int epfd, const char *ip, int port);
 
 /**
  * Copia un mensaje (Como GRANTED) al buffer de escritura y el kernel dispara un 
- * EPOLLOUT. Entonces, algúno de los hilos tomará el mensaje y lo redireccionará
+ * EPOLLOUT. Entonces, algúno de los hilos tomará el mensaje y lo redireccionará.
+ * Thread-safe, utilizar para programar envío de mensajes hacia la red.
  */
 void enqueue_write(int epfd, connection_t *conn, const char *msg);
 
