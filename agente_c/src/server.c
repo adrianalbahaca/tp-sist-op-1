@@ -28,6 +28,11 @@ extern void process_message(connection_t *conn, char *msg);
 extern void process_announce(const char *ip_sender, const char *message);
 
 /**
+ * Llamar antes de destruir el socket
+ */
+extern void process_disconnect(connection_t *conn);
+
+/**
  * O_NONBLOCK para que retorne automáticamente y no se bloquee
  * EAGAIN o EWOULDBLOCK
  */
@@ -63,8 +68,9 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     memset(&addr, 0, sizeof(addr)); // inicializa a 0
     addr.sin_family = AF_INET; // Por INET
     addr.sin_port = htons(port); 
-    inet_pton(AF_INET, ip, &addr.sin_addr);
+    inet_pton(AF_INET, ip, &addr.sin_addr); // Escucharé a esta IP
 
+    // Vincula el socket a esta IP 
     if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("bind");
         exit(EXIT_FAILURE);
@@ -72,12 +78,14 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
 
     // Solo los sockets TCP requieren listen()
     if (!is_udp) {
+        // Lo pone en estado de escucha pasiva para recibir peticiones
         if (listen(fd, SOMAXCONN) < 0) {
             perror("listen");
             exit(EXIT_FAILURE);
         }
     }
 
+    // Para que accept no bloquee el hilo
     set_nonblocking(fd);
 
     // Alocamos la estructura en el heap para que persista
@@ -106,6 +114,7 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
 }
 
 int connect_remote_node(int epfd, const char *ip, int port) {
+    // Crea el socket
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         perror("socket saliente");
@@ -120,9 +129,11 @@ int connect_remote_node(int epfd, const char *ip, int port) {
     remote_addr.sin_port = htons(port);
     inet_pton(AF_INET, ip, &remote_addr.sin_addr);
 
-    /* connect() sobre un socket no bloqueante retornará inmediatamente.
+    /**
+     * connect() sobre un socket no bloqueante retornará inmediatamente.
      * Si la conexión es a localhost, puede retornar 0.
      * Para red externa, retornará -1 con errno == EINPROGRESS.
+     * "Inicio del handshake" como cliente
      */
     int res = connect(sockfd, (struct sockaddr*)&remote_addr, sizeof(remote_addr));
     
@@ -146,7 +157,8 @@ int connect_remote_node(int epfd, const char *ip, int port) {
     conn->write_len = 0;
 
     struct epoll_event ev;
-    /* Se espera EPOLLOUT para confirmar que el handshake finalizó.
+    /**
+     * Se espera EPOLLOUT para confirmar que el handshake finalizó.
      * EPOLLONESHOT garantiza exclusión mutua en el event loop multihilo.
      */
     ev.events = EPOLLOUT | EPOLLONESHOT;
@@ -181,7 +193,8 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         return;
     }
 
-    /* La conexión fue exitosa. 
+    /**
+     * La conexión fue exitosa. 
      * Se debe reconfigurar el evento en epoll para operar de forma regular
      * esperando lecturas (EPOLLIN) para recibir los GRANTED/DENIED.
      */
@@ -197,7 +210,6 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         free(conn);
     }
 }
-
 
 static void handle_udp_read(connection_t *conn) {
     char buffer[BUFF_SIZE];
@@ -238,8 +250,6 @@ static void handle_udp_read(connection_t *conn) {
      */
 }
 
-
-
 static void handle_tcp_read(int epfd, connection_t *conn) {
     int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
 
@@ -270,6 +280,8 @@ static void handle_tcp_read(int epfd, connection_t *conn) {
 
     if (bytes_read == 0) {
         /* EOF: El extremo remoto cerró la conexión de manera ordenada */
+        // NOTIFICACIÓN ANTES DE DESTRUIR
+        process_disconnect(conn);
         close(conn->fd);
         free(conn);
         return;
@@ -326,7 +338,8 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
 
     if (bytes_written < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            /* El buffer del socket está lleno. 
+            /**
+             * El buffer del socket está lleno. 
              * Se rearma el descriptor esperando EPOLLOUT para reanudar luego.
              */
             struct epoll_event ev;
@@ -377,15 +390,13 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
 
 static void handle_accept(int epfd, connection_t *listen_conn) {
     /** 
-     * Se itera sobre accept() hasta que retorne EAGAIN. 
-     * Esto es fundamental porque múltiples conexiones pueden haber ingresado 
-     * simultáneamente en la cola del kernel antes de que el hilo despierte.
+     * Se itera sobre accept() hasta que retorne EAGAIN para limipiar todo el buffer
      */
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         
-        int client_fd = accept(listen_conn->fd, (struct sockaddr *)&client_addr, &client_len);
+        int client_fd = accept(listen_conn->fd, &client_addr, &client_len);
         
         if (client_fd == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -419,10 +430,9 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
         }
 
         struct epoll_event ev;
-        /* * EPOLLONESHOT es imperativo aquí para concurrencia multihilo.
-         * Garantiza que, una vez que epoll notifique actividad en este socket,
-         * lo deshabilitará automáticamente hasta que el hilo termine de procesarlo
-         * y ejecute epoll_ctl(EPOLL_CTL_MOD).
+        /** 
+         * EPOLLONESHOT es porque como estamos en multithread, si no se pone puede
+         * que varios lo agarren y no queremos eso, una vez que laburo se debe reagregar.
          */
         ev.events = EPOLLIN | EPOLLONESHOT;
         ev.data.ptr = new_conn;
@@ -458,6 +468,8 @@ void* worker_thread_loop(void* arg) {
             // Tratamiento de errores en el socket (cierre abrupto, reset)
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & (EPOLLIN | EPOLLOUT)))) {
                 fprintf(stderr, "Error en el socket %d\n", conn->fd);
+                // NOTIFICACIÓN ANTES DE DESTRUIR
+                process_disconnect(conn);
                 close(conn->fd);
                 free(conn);
                 continue;
@@ -480,7 +492,6 @@ void* worker_thread_loop(void* arg) {
                     case CONN_TCP_CLIENT_REMOTE:
                     case CONN_TCP_CLIENT_LOCAL:
                     case CONN_TCP_OUTGOING:
-                        // Datos provenientes de un agente remoto o del planificador Erlang local
                         handle_tcp_read(epfd, conn);
                         break;
                 }
@@ -491,9 +502,13 @@ void* worker_thread_loop(void* arg) {
                 switch (conn->type) {
                     case CONN_TCP_CLIENT_REMOTE:
                     case CONN_TCP_CLIENT_LOCAL:
-                    case CONN_TCP_OUTGOING:
                         handle_tcp_write(epfd, conn);
                         break;
+
+                    case CONN_TCP_OUTGOING:
+                        handle_outgoing_connection_event(epfd, conn);
+                        break;
+
                     default:
                         break;
                 }
@@ -511,14 +526,22 @@ int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
         return -1;
     }
     
-    // TCP Público (Agentes C)
+    // TCP Público (Agentes C) -- Escuchará otros servidores
     create_listen_socket(*epfd, public_ip, tcp_port, CONN_TCP_PUBLIC_LISTEN, 0);
     
-    // TCP Local (Erlang)
+    // TCP Local (Erlang) -- Escuchará al Erland local
     create_listen_socket(*epfd, "127.0.0.1", tcp_port, CONN_TCP_LOCAL_LISTEN, 0);
     
     // UDP Broadcast (Descubrimiento) con 0.0.0.0 (INADDR_ANY)
     create_listen_socket(*epfd, "0.0.0.0", UDP_DISCOVERY_PORT, CONN_UDP_DISCOVERY, 1);
+
+    /**
+     * Después de estos 3 create, se han creado 3 sockets de escucha que ahora
+     * iterarán en work_thread_loop. Están en la instancia de epoll y estarán
+     * esperando que alguien les diga algo. Los 3 están en escucha por si les 
+     * llega algo, y según cuando llegue un mensjae, el epoll verá para quien y
+     * lo redirigirá
+     */
 
     return 0;
 }
@@ -555,3 +578,39 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     }
 }
 
+void send_udp_broadcast(int port, const char *message) {
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        perror("socket broadcast saliente");
+        return;
+    }
+
+    /**
+     * Modificación de la flag de socket a nivel kernel para permitir el envío 
+     * de paquetes a direcciones de broadcast. Si no se habilita, sendto() fallará con EACCES.
+     */
+    int broadcast_enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
+        perror("setsockopt SO_BROADCAST");
+        close(sock);
+        return;
+    }
+
+    struct sockaddr_in broadcast_addr;
+    memset(&broadcast_addr, 0, sizeof(broadcast_addr));
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = htons(port);
+    // INADDR_BROADCAST es equivalente a 255.255.255.255
+    broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST); 
+
+    // Envío del datagrama completo de una sola vez
+    ssize_t sent = sendto(sock, message, strlen(message), 0, 
+                          (struct sockaddr*)&broadcast_addr, sizeof(broadcast_addr));
+    
+    if (sent < 0) {
+        perror("sendto broadcast");
+    }
+
+    // Se destruye el socket efímero; no se necesita mantener estado para enviar datagramas sueltos
+    close(sock);
+}

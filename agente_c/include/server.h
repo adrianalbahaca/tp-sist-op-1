@@ -67,4 +67,11 @@ int connect_remote_node(int epfd, const char *ip, int port);
  */
 void enqueue_write(int epfd, connection_t *conn, const char *msg);
 
+/**
+ * Función a llamar cada N segundos para avisar de nuestra existencia a otros 
+ * nodos
+ * send_udp_broadcast(12529, "ANNOUNCE 192.168.1.10 8100 cpu:4 mem:8192 gpu:1\n")
+ */
+void send_udp_broadcast(int port, const char *message);
+
 #endif /* __SERVER_H__ */
