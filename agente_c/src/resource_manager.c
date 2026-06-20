@@ -4,6 +4,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include "../include/resource_types.h"
 
 #define TAM_TABLA_JOBS 71 // Se selecciona un numero primo chico por cuestiones de optimización
 
@@ -12,12 +13,6 @@ typedef enum {
     RM_QUEUED,
     RM_DENIED
 } result_t;
-
-typedef enum {
-    RESOURCE_CPU,
-    RESOURCE_MEM,
-    RESOURCE_GPU
-} resource_t;
 
 // La tabla de jobs será una tabla hash con función de hasheo simple
 typedef struct Allocation {
@@ -65,11 +60,6 @@ typedef struct {
     Recurso recursos[3];
     TablaJobs tabla;
 } ResourceManager;
-
-/**
- * El gestor de recursos se define estáticamente para trabajar con memoria dinámica lo menos posible y evitar complicaciones
- */
-static ResourceManager manager;
 
 /**
  * ======================================================================================
@@ -189,42 +179,45 @@ static void table_remove(TablaJobs *j) {
  * ======================================================================================
  */
 
-void manager_init(int cpu, int mem, int gpu) {
-    manager.recursos[RESOURCE_CPU].available_amount = manager.recursos[RESOURCE_CPU].total_amount = cpu;
-    manager.recursos[RESOURCE_MEM].available_amount = manager.recursos[RESOURCE_MEM].total_amount = mem;
-    manager.recursos[RESOURCE_GPU].available_amount = manager.recursos[RESOURCE_GPU].total_amount = gpu;
+
+
+ResourceManager manager_init(int cpu, int mem, int gpu) {
+    ResourceManager* manager = malloc(sizeof(ResourceManager));
+    manager->recursos[RESOURCE_CPU].available_amount = manager->recursos[RESOURCE_CPU].total_amount = cpu;
+    manager->recursos[RESOURCE_MEM].available_amount = manager->recursos[RESOURCE_MEM].total_amount = mem;
+    manager->recursos[RESOURCE_GPU].available_amount = manager->recursos[RESOURCE_GPU].total_amount = gpu;
     
-    table_init(&manager.tabla);
+    table_init(&manager->tabla);
 
-    queue_init(&manager.recursos[RESOURCE_CPU].cola);
-    queue_init(&manager.recursos[RESOURCE_MEM].cola);
-    queue_init(&manager.recursos[RESOURCE_GPU].cola);
+    queue_init(&manager->recursos[RESOURCE_CPU].cola);
+    queue_init(&manager->recursos[RESOURCE_MEM].cola);
+    queue_init(&manager->recursos[RESOURCE_GPU].cola);
 
-    pthread_mutex_init(&manager.recursos[RESOURCE_CPU].mutex, NULL);
-    pthread_mutex_init(&manager.recursos[RESOURCE_MEM].mutex, NULL);
-    pthread_mutex_init(&manager.recursos[RESOURCE_GPU].mutex, NULL);
+    pthread_mutex_init(&manager->recursos[RESOURCE_CPU].mutex, NULL);
+    pthread_mutex_init(&manager->recursos[RESOURCE_MEM].mutex, NULL);
+    pthread_mutex_init(&manager->recursos[RESOURCE_GPU].mutex, NULL);
 
-    return;
+    return manager;
 }
 
-void manager_destroy() {
-    pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
-    queue_destroy(&manager.recursos[RESOURCE_CPU].cola);
-    pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+void manager_destroy(ResourceManager* manager) {
+    pthread_mutex_lock(&manager->recursos[RESOURCE_CPU].mutex);
+    queue_destroy(&manager->recursos[RESOURCE_CPU].cola);
+    pthread_mutex_unlock(&manager->recursos[RESOURCE_CPU].mutex);
 
-    pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
-    queue_destroy(&manager.recursos[RESOURCE_MEM].cola);
-    pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+    pthread_mutex_lock(&manager->recursos[RESOURCE_MEM].mutex);
+    queue_destroy(&manager->recursos[RESOURCE_MEM].cola);
+    pthread_mutex_unlock(&manager->recursos[RESOURCE_MEM].mutex);
 
-    pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
-    queue_destroy(&manager.recursos[RESOURCE_GPU].cola);
-    pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+    pthread_mutex_lock(&manager->recursos[RESOURCE_GPU].mutex);
+    queue_destroy(&manager->recursos[RESOURCE_GPU].cola);
+    pthread_mutex_unlock(&manager->recursos[RESOURCE_GPU].mutex);
 
-    table_destroy(&manager.tabla);
+    table_destroy(&manager->tabla);
 
-    pthread_mutex_destroy(&manager.recursos[RESOURCE_CPU].mutex);
-    pthread_mutex_destroy(&manager.recursos[RESOURCE_MEM].mutex);
-    pthread_mutex_destroy(&manager.recursos[RESOURCE_GPU].mutex);
+    pthread_mutex_destroy(&manager->recursos[RESOURCE_CPU].mutex);
+    pthread_mutex_destroy(&manager->recursos[RESOURCE_MEM].mutex);
+    pthread_mutex_destroy(&manager->recursos[RESOURCE_GPU].mutex);
 
     return;
 }

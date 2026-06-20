@@ -11,6 +11,6 @@
  * 6. Entender la tabla de jobs para detectar desconexiones
  */
 
-
+typedef ResourceManager ResourceManager;
 
 #endif
