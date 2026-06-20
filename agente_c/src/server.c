@@ -1,4 +1,5 @@
 #include "../include/server.h"
+#include "../include/resource_manager.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +19,9 @@
  * Dentro de handle_tcp_read, luego de cambiar (\n) por (\0).
  * Debe decidir qué hacer con el mensaje, si RESERVE, RELEASE, etc.
  */
-extern void process_message(connection_t *conn, char *msg);
+extern void process_message(connection_t *conn, char *msg) {
+    return;
+}
 
 
 /**

@@ -69,8 +69,8 @@ La base de código está estructurada para permitir el desarrollo en paralelo. A
 | `src/main.c` | Punto de entrada, inicialización de estructuras y orquestación del demonio. | **[Nombre Integrante 4]** *(Integración)* |
 | `src/server.c`<br>`include/server.h` | Multiplexación `epoll`, I/O no bloqueante, manejo de descriptores TCP/UDP. | **[Nombre Integrante 1]** *(Comunicaciones)* |
 | `src/discovery.c`<br>`include/discovery.h` | Emisión y recepción de datagramas UDP para descubrimiento topológico. | **[Nombre Integrante 1]** *(Comunicaciones)* |
-| `src/resource_manager.c`<br>`include/resource_manager.h` | Gestión de memoria, actualización de recursos, tabla de jobs y colas FIFO. | **[Nombre Integrante 2]** *(Gestor de Estado)* |
-| `src/protocol.c`<br>`include/protocol.h` | Funciones de parseo de línea ASCII a estructuras de datos nativas en C. | **[Nombre Integrante 2]** *(Gestor de Estado)* |
+| `src/resource_manager.c`<br>`include/resource_manager.h` | Gestión de memoria, actualización de recursos, tabla de jobs y colas FIFO. | **[Adrian Albahaca]** *(Gestor de Estado)* |
+| `src/protocol.c`<br>`include/protocol.h` | Funciones de parseo de línea ASCII a estructuras de datos nativas en C. | **[Adrian Albahaca]** *(Gestor de Estado)* |
 
 ### 📁 `planificador_erl/` (Capa de Lógica y Coordinación)
 
