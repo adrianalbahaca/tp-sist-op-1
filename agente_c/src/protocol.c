@@ -2,6 +2,44 @@
 #include "../include/protocol.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+/**
+ * =================================================================================================
+ * Código de la lista de requests
+ * =================================================================================================
+ */
+static void resource_list_insert(resource_request_t *list, char ip[16], resource_t type, int amount) {
+    resource_request_t *resource = malloc(sizeof(resource_request_t));
+    resource->amount = amount;
+    resource->type = type;
+    strcpy(resource->ip, ip);
+
+    if (list == NULL) {
+        resource->next = NULL;
+    }
+    else {
+        resource->next = list;
+    }
+
+    *list = *resource; // Verificar esto después
+
+    return;
+}
+
+static void resource_list_destroy(resource_request_t *list) {
+    resource_request_t *next;
+
+    while (list != NULL) {
+        next = list->next;
+        free(list->ip);
+        free(list);
+        list = next;
+    }
+
+    list = NULL;
+    return;
+}
 
 reserve_msg_t parse_reserve(const char* msg) {
     reserve_msg_t result;
@@ -98,4 +136,41 @@ denied_msg_t parse_denied(const char* msg) {
     result.valido = true;
 
     return result;
+}
+
+job_request_t parse_job_request(const char* msg) {
+    job_request_t result;
+    result.valido = false;
+
+    // Obtener job_id
+    int job_id;
+    if (sscanf(msg, "JOB_REQUEST %d", &job_id) != 1) {
+        return result;
+    }
+
+    // Empezar compilación de elementos
+    result.request_list = NULL; // La lista inicia vacía
+
+    // Descartar los primeros 2 comandos
+    char* token = strtok(msg, " ");
+    token = strtok(NULL, " ");
+
+    // Luego, iterar sobre cada uno
+    char ip[16], recurso[16];
+    int amount;
+
+    while ((token = strtok_r(NULL, " ")) != NULL) {
+        if (sscanf(token, "@%15[^:]:%15[^:]:%d", ip, recurso, &amount) != 3) {
+            resource_list_destroy(&result.request_list);
+            return result;
+        }
+        else {
+            resource_list_insert(&result.request_list, ip, recurso, amount);
+        }
+    }
+
+    // Si salió sin problemas, se debe de retornar el resultado adecuadamente
+    result.valido = true;
+    return result;
+
 }

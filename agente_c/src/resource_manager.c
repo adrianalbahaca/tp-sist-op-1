@@ -1,5 +1,7 @@
 #include "../include/resource_manager.h"
 #include "../include/server.h"
+#include "../include/protocol.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -193,7 +195,7 @@ static void table_remove(TablaJobs *j) {
  */
 
 // Atiende una orden RESERVE y devuelve una respuesta acorde
-static result_t reserve_resource (resource_t tipo, int amount) {
+static result_t reserve_resource (resource_t tipo, int amount, int job_id, connection_t *conn) {
     result_t result;
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
 
@@ -202,7 +204,8 @@ static result_t reserve_resource (resource_t tipo, int amount) {
         result = RM_GRANTED;
     }
     else {
-        result = RM_DENIED;
+        queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn);
+        result = RM_QUEUED;
     }
 
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
@@ -273,5 +276,102 @@ void manager_destroy() {
     pthread_mutex_destroy(&manager.recursos[RESOURCE_MEM].mutex);
     pthread_mutex_destroy(&manager.recursos[RESOURCE_GPU].mutex);
 
+    return;
+}
+
+/**
+ * Dentro de handle_tcp_read, luego de cambiar (\n) por (\0).
+ * Debe decidir qué hacer con el mensaje, si RESERVE, RELEASE, etc.
+ */
+void process_message(connection_t *conn, char *msg) {
+    // Se parsea la primera palabra usando caso por caso dependiendo del primer comando
+    if (strncmp(msg, "RESERVE", 7) == 0) {
+        reserve_msg_t result = parse_reserve(msg);
+        if (result.valido) {
+            // Enviar mensaje de que se pudo pedir lo solicitado
+            result_t r = reserve_resource(result.type, result.amount, result.job_id, conn);
+            if (r == RM_GRANTED) {
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "GRANTED %d", result.job_id);
+                enqueue_write(g_epfd, conn, buf);
+            }
+        }
+        else {
+            fprintf(stderr, "RESERVE mal formado %s\n", msg);
+        }
+    }
+    else if (strncmp(msg, "RELEASE", 7) == 0) {
+        release_msg_t result = parse_release(msg);
+
+        if (result.valido) {
+            release_resource(result.type, result.amount);
+        }
+        else {
+            fprintf(stderr, "RELEASE mal formado %s\n", msg);
+        }
+    }
+    else if (strncmp(msg, "GRANTED", 7) == 0) {
+        granted_msg_t result = parse_granted(msg);
+
+        if (result.valido) {
+            fprintf(stderr, "GRANTED recibido del job %d\n", result.job_id);
+            /**
+             * TODO: Una vez se tenga la orquestación multi-nodo, se envía al nodo correspondiente
+             */
+        }
+        else {
+            fprintf(stderr, "GRANTED mal formado: %s\n", msg);
+        }
+    }
+    else if (strncmp(msg, "DENIED", 6) == 0) {
+        denied_msg_t result = parse_denied(msg);
+
+        if (result.valido) {
+            fprintf(stderr, "DENIED recibido del job %d\n", result.job_id);
+            /**
+             * TODO: Una vez se tenga la orquestación multi-nodo, se envía al nodo correspondiente
+             */
+        }
+        else {
+            fprintf(stderr, "DENIED mal formado: %s\n", msg);
+        }
+    }
+    else if (strncmp(msg, "JOB_REQUEST", 11) == 0) {
+        /**
+         * TODO: Parsear para el caso local, y después extender para el caso multi-nodo
+         */
+    }
+    return;
+}
+
+/**
+ * Dentro de handle_udp_read, por cada datagrama que llega al socket UDP.
+ * Para agregarlo a los conocidos.
+ */
+void process_announce(const char *ip_sender, const char *message) {
+    return;
+}
+
+
+/**
+ * Llamar antes de destruir el socket
+ */
+void process_disconnect(connection_t *conn) {
+    return;
+}
+
+/**
+ * Se llama cuando un connect_remote_node finaliza con éxito.
+ * Acá el Gestor de Estado ya puede llamar a enqueue_write con sus peticiones.
+ */
+void process_connection_ready(connection_t *conn) {
+    return;
+}
+
+/**
+ * Se llama si connect_remote_node falló (ej. el nodo B estaba apagado).
+ * El Gestor de Estado debe abortar su plan y quizás buscar otro nodo.
+ */
+void process_connection_failed(connection_t *conn) {
     return;
 }

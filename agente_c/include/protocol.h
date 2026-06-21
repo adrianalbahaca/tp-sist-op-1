@@ -9,10 +9,11 @@ typedef struct resource_request_t {
     char ip[16];
     resource_t type;
     int amount;
-    struct resource_request_t next;
+    struct resource_request_t *next;
 } resource_request_t;
 
 typedef struct {
+    bool valido;
     int job_id;
     resource_request_t *request_list;
 } job_request_t;
@@ -39,5 +40,13 @@ typedef struct {
 } granted_msg_t;
 
 typedef granted_msg_t denied_msg_t;
+
+reserve_msg_t parse_reserve(const char* msg);
+
+release_msg_t parse_release(const char* msg);
+
+granted_msg_t parse_granted(const char* msg);
+
+denied_msg_t parse_denied(const char* msg);
 
 #endif
