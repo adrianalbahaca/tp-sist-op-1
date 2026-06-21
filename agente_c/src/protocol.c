@@ -13,7 +13,8 @@ static void resource_list_insert(resource_request_t **list, char ip[16], resourc
     resource_request_t *resource = malloc(sizeof(resource_request_t));
     resource->amount = amount;
     resource->type = type;
-    strcpy(resource->ip, ip);
+    strncpy(resource->ip, ip, sizeof(resource->ip)-1);
+    resource->ip[sizeof(resource->ip) - 1] = '\0';
 
     if (list == NULL) {
         resource->next = NULL;
