@@ -130,6 +130,11 @@ static PendingRequest* queue_dequeue(ColaPendingRequest *c) {
     if (!queue_is_empty(c)) {
         PendingRequest* tope = c->top;
         c->top = tope->sig;
+
+        if (c->top == NULL) {
+            c->bottom = NULL;
+        }
+        
         tope->sig = NULL;
         return tope;
     }
@@ -226,6 +231,7 @@ static void release_resource (resource_t tipo, int amount) {
         char buf[BUFF_SIZE];
         snprintf(buf, sizeof(buf), "GRANTED %d", pending->job_id);
         enqueue_write(g_epfd, pending->owner_conn, buf);
+        free(pending);
     }
 
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);

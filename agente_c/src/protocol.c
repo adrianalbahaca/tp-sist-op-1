@@ -9,7 +9,7 @@
  * Código de la lista de requests
  * =================================================================================================
  */
-static void resource_list_insert(resource_request_t *list, char ip[16], resource_t type, int amount) {
+static void resource_list_insert(resource_request_t **list, char ip[16], resource_t type, int amount) {
     resource_request_t *resource = malloc(sizeof(resource_request_t));
     resource->amount = amount;
     resource->type = type;
@@ -19,10 +19,10 @@ static void resource_list_insert(resource_request_t *list, char ip[16], resource
         resource->next = NULL;
     }
     else {
-        resource->next = list;
+        resource->next = *list;
     }
 
-    *list = *resource; // Verificar esto después
+    *list = resource;
 
     return;
 }
@@ -138,7 +138,7 @@ denied_msg_t parse_denied(const char* msg) {
     return result;
 }
 
-job_request_t parse_job_request(const char* msg) {
+job_request_t parse_job_request(char* msg) {
     job_request_t result;
     result.valido = false;
 
@@ -152,20 +152,36 @@ job_request_t parse_job_request(const char* msg) {
     result.request_list = NULL; // La lista inicia vacía
 
     // Descartar los primeros 2 comandos
-    char* token = strtok(msg, " ");
-    token = strtok(NULL, " ");
+    char* saveptr;
+    char* token = strtok_r(msg, " ", &saveptr);
+    token = strtok_r(NULL, " ", &saveptr);
 
     // Luego, iterar sobre cada uno
     char ip[16], recurso[16];
     int amount;
+    resource_t type;
 
-    while ((token = strtok_r(NULL, " ")) != NULL) {
+    while ((token = strtok_r(NULL, " ", &saveptr)) != NULL) {
         if (sscanf(token, "@%15[^:]:%15[^:]:%d", ip, recurso, &amount) != 3) {
-            resource_list_destroy(&result.request_list);
+            resource_list_destroy(result.request_list);
             return result;
         }
         else {
-            resource_list_insert(&result.request_list, ip, recurso, amount);
+            if (strcmp(recurso, "cpu") == 0) {
+                type = RESOURCE_CPU;
+            }
+            else if (strcmp(recurso, "mem") == 0) {
+                type = RESOURCE_MEM;
+            }
+            else if (strcmp(recurso, "gpu") == 0) {
+                type = RESOURCE_GPU;
+            }
+            else {
+                resource_list_destroy(result.request_list);
+                return result;
+            }
+
+            resource_list_insert(&result.request_list, ip, type, amount);
         }
     }
 
