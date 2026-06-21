@@ -50,4 +50,6 @@ granted_msg_t parse_granted(const char* msg);
 
 denied_msg_t parse_denied(const char* msg);
 
+job_request_t parse_job_request(const char* buf);
+
 #endif

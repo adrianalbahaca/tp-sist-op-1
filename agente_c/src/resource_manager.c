@@ -9,6 +9,7 @@
 #include "../include/resource_types.h"
 
 #define TAM_TABLA_JOBS 71 // Se selecciona un numero primo chico por cuestiones de optimización
+#define TAM_TABLA_CONN 71
 
 typedef enum {
     RM_GRANTED,
@@ -63,10 +64,23 @@ typedef struct {
     TablaJobs tabla;
 } ResourceManager;
 
+typedef struct ConnEntry{
+    char ip[16];
+    connection_t *conn;
+    struct ConnEntry *next;
+} ConnEntry;
+
+typedef struct {
+    ConnEntry *buckets[TAM_TABLA_CONN];
+    pthread_mutex_t mutex;
+} TablaConns;
+
 /**
  * El gestor de recursos se define estáticamente para trabajar con memoria dinámica lo menos posible y evitar complicaciones
  */
 static ResourceManager manager;
+
+static TablaConns tabla_conns;
 
 /**
  * Se ajusta el epoll local para que lo use el manager
@@ -75,6 +89,14 @@ static int g_epfd;
 
 void manager_set_epoll(int epfd) {
     g_epfd = epfd;
+}
+
+static char g_ip[16];
+
+void manager_set_ip(const char *ip) {
+    strncpy(g_ip, ip, sizeof(g_ip) - 1);
+    g_ip[sizeof(g_ip) - 1] = '\0';
+    return;
 }
 /**
  * ======================================================================================
@@ -134,7 +156,7 @@ static PendingRequest* queue_dequeue(ColaPendingRequest *c) {
         if (c->top == NULL) {
             c->bottom = NULL;
         }
-        
+
         tope->sig = NULL;
         return tope;
     }
@@ -235,6 +257,82 @@ static void release_resource (resource_t tipo, int amount) {
     }
 
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
+}
+
+/**
+ * ======================================================================================
+ * Funciones de la tabla de conexiones
+ * ======================================================================================
+ */
+void tabla_conns_init() {
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        tabla_conns.buckets[i] = NULL;
+    }
+    pthread_mutex_init(&tabla_conns.mutex, NULL);
+    return;
+}
+
+static unsigned int hash_ip(const char *ip) {
+    unsigned int hash = 0;
+    while (*ip) {
+        hash = hash * 31 + (unsigned char)(*ip);
+        ip++;
+    }
+    return hash % TAM_TABLA_CONN;
+}
+
+void tabla_conns_insert(char ip[], connection_t *conn) {
+    pthread_mutex_lock(&tabla_conns.mutex);
+    unsigned int idx = hash_ip(ip);
+
+    ConnEntry *c = malloc(sizeof(ConnEntry));
+    c->conn = conn;
+    strncpy(c->ip, ip, 16);
+
+    // Insertar elemento en el bucket dado. Es una inserción en una lista simplemente enlazada
+    ConnEntry *start = tabla_conns.buckets[idx];
+    c->next = start;
+
+    tabla_conns.buckets[idx] = c;
+
+    pthread_mutex_unlock(&tabla_conns.mutex);
+}
+
+connection_t* tabla_conns_lookup(char ip[]) {
+    pthread_mutex_lock(&tabla_conns.mutex);
+    unsigned int idx = hash_ip(ip);
+
+    // Buscar en la lista enlazada del bucket
+    ConnEntry *start = tabla_conns.buckets[idx];
+
+    while (start != NULL) {
+        if (strcmp(start->ip, ip) == 0) {
+            pthread_mutex_unlock(&tabla_conns.mutex);
+            return start->conn;
+        }
+        start = start->next;
+    }
+    pthread_mutex_unlock(&tabla_conns.mutex);
+
+    return NULL;
+}
+
+void tabla_conns_destroy() {
+    pthread_mutex_lock(&tabla_conns.mutex);
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        if (tabla_conns.buckets[i] != NULL) {
+            // Destruir la lista de conexiones dadas adentro
+            ConnEntry *next;
+            while (tabla_conns.buckets[i] != NULL) {
+                next = tabla_conns.buckets[i]->next;
+                free(tabla_conns.buckets[i]);
+                tabla_conns.buckets[i] = next;
+            }
+        }
+    }
+    pthread_mutex_unlock(&tabla_conns.mutex);
+    pthread_mutex_destroy(&tabla_conns.mutex);
+    return;
 }
 
 /**
@@ -343,9 +441,26 @@ void process_message(connection_t *conn, char *msg) {
         }
     }
     else if (strncmp(msg, "JOB_REQUEST", 11) == 0) {
-        /**
-         * TODO: Parsear para el caso local, y después extender para el caso multi-nodo
-         */
+        job_request_t result = parse_job_request(msg);
+
+        if (!result.valido) {
+            fprintf(stderr, "JOB_REQUEST mal formado %s\n", msg);
+            return;
+        }
+
+        resource_request_t *list = result.request_list;
+
+        while (list != NULL) {
+            if (strcmp(list->ip, g_ip) == 0) {
+                reserve_resource(list->type, list->amount, result.job_id, conn);
+            }
+            else {
+                /**
+                 * TODO: Enviar esta solicitud a cada nodo que estemos conectado
+                 */
+            }
+            list = list->next;
+        }
     }
     return;
 }
