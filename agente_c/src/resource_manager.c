@@ -62,6 +62,19 @@ typedef struct {
 } ResourceManager;
 
 /**
+ * El gestor de recursos se define estáticamente para trabajar con memoria dinámica lo menos posible y evitar complicaciones
+ */
+static ResourceManager manager;
+
+/**
+ * Se ajusta el epoll local para que lo use el manager
+ */
+static int g_epfd;
+
+void manager_set_epoll(int epfd) {
+    g_epfd = epfd;
+}
+/**
  * ======================================================================================
  * Cola de pendientes
  * ======================================================================================
@@ -174,6 +187,47 @@ static void table_remove(TablaJobs *j) {
 }
 
 /**
+ * =====================================================================================
+ * Funciones de Recurso
+ * =====================================================================================
+ */
+
+static result_t reserve_resource (resource_t tipo, int amount) {
+    result_t result;
+    pthread_mutex_lock(&manager.recursos[tipo].mutex);
+
+    if (manager.recursos[tipo].available_amount >= amount) {
+        manager.recursos[tipo].available_amount -= amount;
+        result = RM_GRANTED;
+    }
+    else {
+        result = RM_DENIED;
+    }
+
+    pthread_mutex_unlock(&manager.recursos[tipo].mutex);
+
+    return result;
+}
+
+static void release_resource (resource_t tipo, int amount) {
+    result_t result;
+    pthread_mutex_lock(&manager.recursos[tipo].mutex);
+    manager.recursos[tipo].available_amount += amount;
+
+    ColaPendingRequest *cola = &manager.recursos[tipo].cola;
+    while (!queue_is_empty(cola) &&
+            manager.recursos[tipo].available_amount >= cola->top->amount) {
+        PendingRequest* pending = queue_dequeue(cola);
+        manager.recursos[tipo].available_amount -= pending->amount;
+        char buf[BUFF_SIZE];
+        snprinf(buf, sizeof(buf), "GRANTED %d", pending->job_id);
+        enqueue_write(g_epfd, pending->owner_conn, buf);
+    }
+
+    pthread_mutex_unlock(&manager.recursos[tipo].mutex);
+}
+
+/**
  * ======================================================================================
  * Funciones de Resource Manager
  * ======================================================================================
@@ -181,43 +235,42 @@ static void table_remove(TablaJobs *j) {
 
 
 
-ResourceManager manager_init(int cpu, int mem, int gpu) {
-    ResourceManager* manager = malloc(sizeof(ResourceManager));
-    manager->recursos[RESOURCE_CPU].available_amount = manager->recursos[RESOURCE_CPU].total_amount = cpu;
-    manager->recursos[RESOURCE_MEM].available_amount = manager->recursos[RESOURCE_MEM].total_amount = mem;
-    manager->recursos[RESOURCE_GPU].available_amount = manager->recursos[RESOURCE_GPU].total_amount = gpu;
+void manager_init(int cpu, int mem, int gpu) {
+    manager.recursos[RESOURCE_CPU].available_amount = manager.recursos[RESOURCE_CPU].total_amount = cpu;
+    manager.recursos[RESOURCE_MEM].available_amount = manager.recursos[RESOURCE_MEM].total_amount = mem;
+    manager.recursos[RESOURCE_GPU].available_amount = manager.recursos[RESOURCE_GPU].total_amount = gpu;
     
-    table_init(&manager->tabla);
+    table_init(&manager.tabla);
 
-    queue_init(&manager->recursos[RESOURCE_CPU].cola);
-    queue_init(&manager->recursos[RESOURCE_MEM].cola);
-    queue_init(&manager->recursos[RESOURCE_GPU].cola);
+    queue_init(&manager.recursos[RESOURCE_CPU].cola);
+    queue_init(&manager.recursos[RESOURCE_MEM].cola);
+    queue_init(&manager.recursos[RESOURCE_GPU].cola);
 
-    pthread_mutex_init(&manager->recursos[RESOURCE_CPU].mutex, NULL);
-    pthread_mutex_init(&manager->recursos[RESOURCE_MEM].mutex, NULL);
-    pthread_mutex_init(&manager->recursos[RESOURCE_GPU].mutex, NULL);
+    pthread_mutex_init(&manager.recursos[RESOURCE_CPU].mutex, NULL);
+    pthread_mutex_init(&manager.recursos[RESOURCE_MEM].mutex, NULL);
+    pthread_mutex_init(&manager.recursos[RESOURCE_GPU].mutex, NULL);
 
-    return manager;
+    return;
 }
 
-void manager_destroy(ResourceManager* manager) {
-    pthread_mutex_lock(&manager->recursos[RESOURCE_CPU].mutex);
-    queue_destroy(&manager->recursos[RESOURCE_CPU].cola);
-    pthread_mutex_unlock(&manager->recursos[RESOURCE_CPU].mutex);
+void manager_destroy() {
+    pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+    queue_destroy(&manager.recursos[RESOURCE_CPU].cola);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
 
-    pthread_mutex_lock(&manager->recursos[RESOURCE_MEM].mutex);
-    queue_destroy(&manager->recursos[RESOURCE_MEM].cola);
-    pthread_mutex_unlock(&manager->recursos[RESOURCE_MEM].mutex);
+    pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+    queue_destroy(&manager.recursos[RESOURCE_MEM].cola);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
 
-    pthread_mutex_lock(&manager->recursos[RESOURCE_GPU].mutex);
-    queue_destroy(&manager->recursos[RESOURCE_GPU].cola);
-    pthread_mutex_unlock(&manager->recursos[RESOURCE_GPU].mutex);
+    pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+    queue_destroy(&manager.recursos[RESOURCE_GPU].cola);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-    table_destroy(&manager->tabla);
+    table_destroy(&manager.tabla);
 
-    pthread_mutex_destroy(&manager->recursos[RESOURCE_CPU].mutex);
-    pthread_mutex_destroy(&manager->recursos[RESOURCE_MEM].mutex);
-    pthread_mutex_destroy(&manager->recursos[RESOURCE_GPU].mutex);
+    pthread_mutex_destroy(&manager.recursos[RESOURCE_CPU].mutex);
+    pthread_mutex_destroy(&manager.recursos[RESOURCE_MEM].mutex);
+    pthread_mutex_destroy(&manager.recursos[RESOURCE_GPU].mutex);
 
     return;
 }

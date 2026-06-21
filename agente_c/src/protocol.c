@@ -54,7 +54,7 @@ release_msg_t parse_release(const char* msg) {
     result.amount = amount;
 
     if (strcmp("cpu", type) == 0) {
-        result.type = RESOURCE_CPU
+        result.type = RESOURCE_CPU;
     }
     else if (strcmp("mem", type) == 0) {
         result.type = RESOURCE_MEM;
