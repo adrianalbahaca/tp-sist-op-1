@@ -1,6 +1,7 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 #include <stdbool.h>
+#include "resource_types.h"
 
 /**
  * La lista de trabajos que tiene que hacer un elemento será una lista simplemente enlazada

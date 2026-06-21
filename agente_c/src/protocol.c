@@ -138,13 +138,15 @@ denied_msg_t parse_denied(const char* msg) {
     return result;
 }
 
-job_request_t parse_job_request(char* msg) {
+job_request_t parse_job_request(const char* buf) {
     job_request_t result;
     result.valido = false;
 
+    char* msg = strdup(buf);
     // Obtener job_id
     int job_id;
     if (sscanf(msg, "JOB_REQUEST %d", &job_id) != 1) {
+        free(msg);
         return result;
     }
 
@@ -164,6 +166,7 @@ job_request_t parse_job_request(char* msg) {
     while ((token = strtok_r(NULL, " ", &saveptr)) != NULL) {
         if (sscanf(token, "@%15[^:]:%15[^:]:%d", ip, recurso, &amount) != 3) {
             resource_list_destroy(result.request_list);
+            free(msg);
             return result;
         }
         else {
@@ -178,6 +181,7 @@ job_request_t parse_job_request(char* msg) {
             }
             else {
                 resource_list_destroy(result.request_list);
+                free(msg);
                 return result;
             }
 
@@ -187,6 +191,7 @@ job_request_t parse_job_request(char* msg) {
 
     // Si salió sin problemas, se debe de retornar el resultado adecuadamente
     result.valido = true;
+    free(msg);
     return result;
 
 }
