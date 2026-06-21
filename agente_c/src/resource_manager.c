@@ -124,6 +124,35 @@ static bool queue_is_empty(ColaPendingRequest *c) {
     return (c->top == NULL && c->bottom == NULL);
 }
 
+static void queue_delete_by_conn(ColaPendingRequest *c, connection_t *conn) {
+    PendingRequest *curr = c->top;
+    PendingRequest *prev = NULL;
+    while (curr != NULL) {
+        PendingRequest *next = curr->sig;
+        if (curr->owner_conn == conn) {
+            // Si es el tope de la cola
+            if (prev == NULL) {
+                c->top = curr->sig;
+            }
+            else {
+                prev->sig = next;
+            }
+
+            // Si es al final de la cola
+            if (c->bottom == curr) {
+                c->bottom = prev;
+            }
+
+            free(curr);
+            curr = next;
+        }
+        else {
+            prev = curr;
+            curr = next;
+        }
+    }
+}
+
 /**
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
  */
@@ -172,13 +201,13 @@ static PendingRequest* queue_dequeue(ColaPendingRequest *c) {
  * ======================================================================================
  */
 
-static void table_init(TablaJobs *j) {
+static void tabla_jobs_init(TablaJobs *j) {
     memset(j->tabla_jobs, 0, TAM_TABLA_JOBS * sizeof(j->tabla_jobs));
     pthread_mutex_init(&j->mutex, NULL);
     return;
 }
 
-static void table_destroy(TablaJobs *j) {
+static void tabla_jobs_destroy(TablaJobs *j) {
     pthread_mutex_lock(&j->mutex);
     for (int i = 0; i < TAM_TABLA_JOBS; i++) {
         Job* job = j->tabla_jobs[i];
@@ -207,11 +236,84 @@ static void table_destroy(TablaJobs *j) {
     return;
 }
 
-static void table_insert(TablaJobs *j) {
+/**
+ * ATENCION: Esta función no es thread-safe de por sí. Asume que TablaJobs->mutex esté tomado
+ */
+static bool buscar_job_tabla(Job *j, int job_id) {
+    Job *curr = j;
+    while (curr != NULL) {
+        if (curr->job_id == job_id)
+            return true;
+        curr = curr->sig;
+    }
+    return false;
+}
+
+static void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount) {
+    pthread_mutex_lock(&j->mutex);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+
+    if (j->tabla_jobs[idx] == NULL || !buscar_job_tabla(j->tabla_jobs[idx], job_id)) {
+        // Crear nuevo Job e insertar el elemento allí
+        Job* job = malloc(sizeof(Job));
+        job->conn = conn;
+        job->job_id = job_id;
+        job->allocations = NULL;
+
+        job->sig = j->tabla_jobs[idx];
+        j->tabla_jobs[idx] = job;
+    }
+
+    // Crear nuevo Allocation a insertar en el Job buscado
+    Job* curr = j->tabla_jobs[idx];
+
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            Allocation *all = malloc(sizeof(Allocation));
+            all->amount = amount;
+            all->name = type;
+
+            all->sig = curr->allocations;
+            curr->allocations = all;
+        }
+    }
+
+    pthread_mutex_unlock(&j->mutex);
     return;
 }
 
-static void table_remove(TablaJobs *j) {
+static void tabla_jobs_remove(TablaJobs *j, int job_id) {
+    pthread_mutex_lock(&j->mutex);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+
+    // Recorrer y eliminar de la lista
+    Job *prev = NULL;
+    Job *start = j->tabla_jobs[idx];
+
+    while (start != NULL) {
+        if (j->tabla_jobs[idx]->job_id == job_id) {
+            // Si es al principio de la lista, es cuestión de actualizar punteros y eliminar
+            if (prev == NULL) {
+                j->tabla_jobs[idx] = start->sig;
+            }
+            else {
+                prev->sig = start->sig;
+            }
+            
+            // Eliminar elementos de la lista de Allocations
+            Allocation * all = start->allocations;
+            Allocation *sig;
+            while (all != NULL) {
+                sig = all->sig;
+                free(all);
+                all = sig;
+            }
+            break;
+        }
+        prev = start;
+        start = start->sig;
+    }
+    pthread_mutex_unlock(&j->mutex);
     return;
 }
 
@@ -315,6 +417,61 @@ connection_t* tabla_conns_lookup(char ip[]) {
     pthread_mutex_unlock(&tabla_conns.mutex);
 
     return NULL;
+}
+
+void tabla_conns_delete(char ip[]) {
+    pthread_mutex_lock(&tabla_conns.mutex);
+    unsigned int idx = hash_ip(ip);
+
+    // Eliminar en la lista del bucket
+    ConnEntry *prev = NULL;
+    ConnEntry *start = tabla_conns.buckets[idx];
+
+    while (start != NULL) {
+        if (strcmp(start->ip, ip) == 0) {
+            // Si es al principio de la lista, es cuestión de actualizar punteros y eliminar
+            if (prev == NULL) {
+                tabla_conns.buckets[idx] = start->next;
+            }
+            else {
+                prev->next = start->next;
+            }
+            free(start);
+            break;
+        }
+        prev = start;
+        start = start->next;
+    }
+
+    pthread_mutex_unlock(&tabla_conns.mutex);
+}
+
+void tabla_conns_delete_by_conn(connection_t *conn) {
+    pthread_mutex_lock(&tabla_conns.mutex);
+
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        // Eliminar en la lista del bucket
+        ConnEntry *prev = NULL;
+        ConnEntry *start = tabla_conns.buckets[i];
+
+        while (start != NULL) {
+            if (start->conn == conn) {
+                // Si es al principio de la lista, es cuestión de actualizar punteros y eliminar
+                if (prev == NULL) {
+                    tabla_conns.buckets[i] = start->next;
+                }
+                else {
+                    prev->next = start->next;
+                }
+                free(start);
+                break;
+            }
+            prev = start;
+            start = start->next;
+        }
+    }
+
+    pthread_mutex_unlock(&tabla_conns.mutex);
 }
 
 void tabla_conns_destroy() {
@@ -456,7 +613,7 @@ void process_message(connection_t *conn, char *msg) {
             }
             else {
                 /**
-                 * TODO: Enviar esta solicitud a cada nodo que estemos conectado
+                 * TODO: Enviar esta solicitud a cada nodo que queremos conectarnos
                  */
             }
             list = list->next;
@@ -478,6 +635,16 @@ void process_announce(const char *ip_sender, const char *message) {
  * Llamar antes de destruir el socket
  */
 void process_disconnect(connection_t *conn) {
+    // Primero, para cada uno de los recursos, es necesario liberarlo de la cola
+    queue_delete_by_conn(&manager.recursos[RESOURCE_CPU].cola, conn);
+    queue_delete_by_conn(&manager.recursos[RESOURCE_MEM].cola, conn);
+    queue_delete_by_conn(&manager.recursos[RESOURCE_GPU].cola, conn);
+
+    // Luego, para la tabla de jobs, es necesario eliminarlos de la tabla de Jobs
+    tabla_jobs_delete_by_conn(&manager.tabla, conn);
+
+    // Finalmente, se elimina la conexión de la tabla de nodos conectados
+    tabla_conns_delete_by_conn(conn);
     return;
 }
 
