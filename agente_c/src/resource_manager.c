@@ -192,6 +192,7 @@ static void table_remove(TablaJobs *j) {
  * =====================================================================================
  */
 
+// Atiende una orden RESERVE y devuelve una respuesta acorde
 static result_t reserve_resource (resource_t tipo, int amount) {
     result_t result;
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
@@ -209,8 +210,8 @@ static result_t reserve_resource (resource_t tipo, int amount) {
     return result;
 }
 
+// Atiende una orden RELEASE, liberando la memoria y la cola acorde
 static void release_resource (resource_t tipo, int amount) {
-    result_t result;
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
     manager.recursos[tipo].available_amount += amount;
 
@@ -220,7 +221,7 @@ static void release_resource (resource_t tipo, int amount) {
         PendingRequest* pending = queue_dequeue(cola);
         manager.recursos[tipo].available_amount -= pending->amount;
         char buf[BUFF_SIZE];
-        snprinf(buf, sizeof(buf), "GRANTED %d", pending->job_id);
+        snprintf(buf, sizeof(buf), "GRANTED %d", pending->job_id);
         enqueue_write(g_epfd, pending->owner_conn, buf);
     }
 
@@ -233,8 +234,7 @@ static void release_resource (resource_t tipo, int amount) {
  * ======================================================================================
  */
 
-
-
+// Inicializa el gestor de recursos del agente en C local
 void manager_init(int cpu, int mem, int gpu) {
     manager.recursos[RESOURCE_CPU].available_amount = manager.recursos[RESOURCE_CPU].total_amount = cpu;
     manager.recursos[RESOURCE_MEM].available_amount = manager.recursos[RESOURCE_MEM].total_amount = mem;
@@ -253,6 +253,7 @@ void manager_init(int cpu, int mem, int gpu) {
     return;
 }
 
+// Destruye el gestor de recursos del agente en C local, liberando la memoria
 void manager_destroy() {
     pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
     queue_destroy(&manager.recursos[RESOURCE_CPU].cola);
