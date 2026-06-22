@@ -1037,7 +1037,6 @@ void process_message(connection_t *conn, char *msg) {
     else if (strncmp(msg, "JOB_RELEASE", 11) == 0) {
         job_release_msg_t result = parse_job_release(msg);
         if (result.valido) {
-            tabla_jobs_remove(&manager.tabla, result.job_id);
 
             char buf[BUFF_SIZE];
             snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
@@ -1053,6 +1052,8 @@ void process_message(connection_t *conn, char *msg) {
             }
             pthread_mutex_unlock(&tabla_conns.mutex);
 
+            tabla_jobs_remove(&manager.tabla, result.job_id);
+            
             eliminar_job_owner(result.job_id);
         }
         else {
