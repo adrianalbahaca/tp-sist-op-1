@@ -52,4 +52,6 @@ denied_msg_t parse_denied(const char* msg);
 
 job_request_t parse_job_request(const char* buf);
 
+void resource_list_destroy(resource_request_t *list);
+
 #endif

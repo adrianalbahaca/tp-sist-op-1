@@ -19,6 +19,11 @@ void manager_destroy();
 void manager_set_epoll(int epfd);
 
 /**
+ * Establece la IP pública/local del agente
+ */
+void manager_set_ip(const char *ip);
+
+/**
  * Dentro de handle_tcp_read, luego de cambiar (\n) por (\0).
  * Debe decidir qué hacer con el mensaje, si RESERVE, RELEASE, etc.
  */
@@ -48,5 +53,7 @@ void process_connection_ready(connection_t *conn);
  */
 void process_connection_failed(connection_t *conn);
 
+
+void tabla_nodos_purge(int timeout_secs);
 
 #endif

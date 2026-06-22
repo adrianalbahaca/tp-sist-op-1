@@ -28,12 +28,12 @@ static void resource_list_insert(resource_request_t **list, char ip[16], resourc
     return;
 }
 
-static void resource_list_destroy(resource_request_t *list) {
+void resource_list_destroy(resource_request_t *list) {
     resource_request_t *next;
 
     while (list != NULL) {
         next = list->next;
-        free(list->ip);
+        // free(list->ip);
         free(list);
         list = next;
     }
@@ -150,7 +150,8 @@ job_request_t parse_job_request(const char* buf) {
         free(msg);
         return result;
     }
-
+    result.job_id = job_id;
+    
     // Empezar compilación de elementos
     result.request_list = NULL; // La lista inicia vacía
 

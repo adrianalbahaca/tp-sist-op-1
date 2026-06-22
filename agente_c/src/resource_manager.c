@@ -139,6 +139,28 @@ static connection_t* buscar_job_owner(int job_id) {
     return NULL;
 }
 
+static void eliminar_job_owner(int job_id) {
+    pthread_mutex_lock(&mutex_job_owners);
+    JobOwner *curr = job_owners;
+    JobOwner *prev = NULL;
+
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            if (prev == NULL) {
+                job_owners = curr->next;
+            } else {
+                prev->next = curr->next;
+            }
+            free(curr);
+            break;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&mutex_job_owners);
+}
+
+
 /**
  * El gestor de recursos se define estáticamente para trabajar con memoria dinámica lo menos posible y evitar complicaciones
  */
@@ -267,7 +289,7 @@ static PendingRequest* queue_dequeue(ColaPendingRequest *c) {
  */
 
 static void tabla_jobs_init(TablaJobs *j) {
-    memset(j->tabla_jobs, 0, TAM_TABLA_JOBS * sizeof(j->tabla_jobs));
+    memset(j->tabla_jobs, 0, sizeof(j->tabla_jobs));
     pthread_mutex_init(&j->mutex, NULL);
     return;
 }
@@ -338,7 +360,7 @@ static void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, reso
     pthread_mutex_lock(&j->mutex);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
-    if (j->tabla_jobs[idx] == NULL || !buscar_job_tabla(j->tabla_jobs[idx], job_id)) {
+    if (!buscar_job_tabla(j->tabla_jobs[idx], job_id)) {
         // Crear nuevo Job e insertar el elemento allí
         Job* job = malloc(sizeof(Job));
         job->conn = conn;
@@ -360,7 +382,9 @@ static void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, reso
 
             all->sig = curr->allocations;
             curr->allocations = all;
+            break;
         }
+        curr = curr->sig;
     }
 
     pthread_mutex_unlock(&j->mutex);
@@ -376,7 +400,7 @@ static void tabla_jobs_remove(TablaJobs *j, int job_id) {
     Job *start = j->tabla_jobs[idx];
 
     while (start != NULL) {
-        if (j->tabla_jobs[idx]->job_id == job_id) {
+        if (start->job_id == job_id) {
             // Si es al principio de la lista, es cuestión de actualizar punteros y eliminar
             if (prev == NULL) {
                 j->tabla_jobs[idx] = start->sig;
@@ -390,6 +414,7 @@ static void tabla_jobs_remove(TablaJobs *j, int job_id) {
             Allocation *sig;
             while (all != NULL) {
                 sig = all->sig;
+                release_resource(all->name, all->amount);
                 free(all);
                 all = sig;
             }
@@ -486,7 +511,11 @@ static void release_resource (resource_t tipo, int amount) {
         PendingRequest* pending = queue_dequeue(cola);
         manager.recursos[tipo].available_amount -= pending->amount;
         char buf[BUFF_SIZE];
-        snprintf(buf, sizeof(buf), "GRANTED %d", pending->job_id);
+        if (pending->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
+            snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", pending->job_id);
+        } else {
+            snprintf(buf, sizeof(buf), "GRANTED %d\n", pending->job_id);
+        }
         enqueue_write(g_epfd, pending->owner_conn, buf);
         free(pending);
     }
@@ -696,6 +725,41 @@ int tabla_nodos_get_puerto(const char *ip) {
     return -1;
 }
 
+/**
+ * Barre la tabla de nodos eliminando aquellos cuyo último anuncio (last_seen)
+ * supere el tiempo de expiración (timeout_secs). Requerido por el protocolo de 15 segundos.
+ */
+void tabla_nodos_purge(int timeout_secs) {
+    pthread_mutex_lock(&tabla_nodos.mutex);
+    time_t now = time(NULL);
+
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        NodeEntry *prev = NULL;
+        NodeEntry *curr = tabla_nodos.buckets[i];
+
+        while (curr != NULL) {
+            if (now - curr->last_seen > timeout_secs) {
+                NodeEntry *to_delete = curr;
+                
+                // Desenlazar el nodo
+                if (prev == NULL) {
+                    tabla_nodos.buckets[i] = curr->next;
+                } else {
+                    prev->next = curr->next;
+                }
+                
+                curr = curr->next;
+                free(to_delete);
+            } else {
+                prev = curr;
+                curr = curr->next;
+            }
+        }
+    }
+    pthread_mutex_unlock(&tabla_nodos.mutex);
+}
+
+
 void tabla_nodos_destroy() {
     pthread_mutex_lock(&tabla_nodos.mutex);
     for (int i = 0; i < TAM_TABLA_CONN; i++) {
@@ -760,6 +824,28 @@ void manager_destroy() {
     pthread_mutex_destroy(&manager.recursos[RESOURCE_MEM].mutex);
     pthread_mutex_destroy(&manager.recursos[RESOURCE_GPU].mutex);
 
+    pthread_mutex_lock(&mutex_pendientes_salientes);
+    OutReq *curr_req = pendientes_salientes;
+    while (curr_req != NULL) {
+        OutReq *next = curr_req->next;
+        free(curr_req);
+        curr_req = next;
+    }
+    pendientes_salientes = NULL;
+    pthread_mutex_unlock(&mutex_pendientes_salientes);
+    pthread_mutex_destroy(&mutex_pendientes_salientes);
+
+    pthread_mutex_lock(&mutex_job_owners);
+    JobOwner *curr_owner = job_owners;
+    while (curr_owner != NULL) {
+        JobOwner *next = curr_owner->next;
+        free(curr_owner);
+        curr_owner = next;
+    }
+    job_owners = NULL;
+    pthread_mutex_unlock(&mutex_job_owners);
+    pthread_mutex_destroy(&mutex_job_owners);
+
     return;
 }
 
@@ -775,8 +861,9 @@ void process_message(connection_t *conn, char *msg) {
             // Enviar mensaje de que se pudo pedir lo solicitado
             result_t r = reserve_resource(result.type, result.amount, result.job_id, conn);
             if (r == RM_GRANTED) {
+                tabla_jobs_insert(&manager.tabla, conn, result.job_id, result.type, result.amount);
                 char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "GRANTED %d", result.job_id);
+                snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
                 enqueue_write(g_epfd, conn, buf);
             }
         }
@@ -789,6 +876,7 @@ void process_message(connection_t *conn, char *msg) {
 
         if (result.valido) {
             release_resource(result.type, result.amount);
+            tabla_jobs_remove(&manager.tabla, result.job_id);
         }
         else {
             fprintf(stderr, "RELEASE mal formado %s\n", msg);
@@ -802,7 +890,7 @@ void process_message(connection_t *conn, char *msg) {
             connection_t *owner = buscar_job_owner(result.job_id);
             if (owner != NULL) {
                 char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "GRANTED %d", result.job_id);
+                snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
                 enqueue_write(g_epfd, owner, buf);
             }
         }
@@ -814,11 +902,11 @@ void process_message(connection_t *conn, char *msg) {
         denied_msg_t result = parse_denied(msg);
 
         if (result.valido) {
-            fprintf(stderr, "DENIED recibido del job %d\n", result.job_id);
+            // fprintf(stderr, "DENIED recibido del job %d\n", result.job_id);
             connection_t *owner = buscar_job_owner(result.job_id);
             if (owner != NULL) {
                 char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "DENIED %d", result.job_id);
+                snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
                 enqueue_write(g_epfd, owner, buf);
             }
         }
@@ -842,13 +930,13 @@ void process_message(connection_t *conn, char *msg) {
                 if (r == RM_GRANTED) {
                     tabla_jobs_insert(&manager.tabla, conn, result.job_id, list->type, list->amount);
                     char buf[BUFF_SIZE];
-                    snprintf(buf, sizeof(buf), "GRANTED %d", result.job_id);
+                    snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
                     enqueue_write(g_epfd, conn, buf);
                 }
             }
             else {
                 char mensaje[BUFF_SIZE];
-                snprintf(mensaje, sizeof(mensaje), "RESERVE %d %s %d",
+                snprintf(mensaje, sizeof(mensaje), "RESERVE %d %s %d\n",
                          result.job_id, resource_type_to_str(list->type), list->amount);
 
                 connection_t *remote = tabla_conns_lookup(list->ip);
@@ -883,21 +971,77 @@ void process_message(connection_t *conn, char *msg) {
             }
             list = list->next;
         }
+        resource_list_destroy(result.request_list);
     }
     else if (strncmp(msg, "GET_NODES", 9) == 0) {
+        char buf[BUFF_SIZE];
+        strcpy(buf, "NODES ");
+        
+        pthread_mutex_lock(&tabla_nodos.mutex);
+        for (int i = 0; i < TAM_TABLA_CONN; i++) {
+            NodeEntry *curr = tabla_nodos.buckets[i];
+            while (curr != NULL) {
+                char tmp[128];
+                // Formato: 192.168.1.10:8100:cpu:4:mem:8192:gpu:1;
+                snprintf(tmp, sizeof(tmp), "%s:%d:cpu:%d:mem:%d:gpu:%d;", 
+                         curr->ip, curr->puerto, curr->cpu_disp, curr->mem_disp, curr->gpu_disp);
+                
+                // Evitar desbordamiento de buffer de forma rudimentaria
+                if (strlen(buf) + strlen(tmp) < BUFF_SIZE - 2) {
+                    strcat(buf, tmp);
+                }
+                curr = curr->next;
+            }
+        }
+        pthread_mutex_unlock(&tabla_nodos.mutex);
+        
+        // Sacar el último ';' si existe y poner \n
+        size_t len = strlen(buf);
+        if (len > 6 && buf[len-1] == ';') buf[len-1] = '\n';
+        else strcat(buf, "\n");
 
+        enqueue_write(g_epfd, conn, buf);
     }
     else if (strncmp(msg, "ANNOUNCE", 8) == 0) {
-
+        // En process anounce
     }
     else if (strncmp(msg, "JOB_RELEASE", 11) == 0) {
+        int job_id;
+        if (sscanf(msg, "JOB_RELEASE %d", &job_id) == 1) {
+            
+            tabla_jobs_remove(&manager.tabla, job_id);
 
+            char buf[BUFF_SIZE];
+            snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
+                     job_id, job_id, job_id);
+
+            pthread_mutex_lock(&tabla_conns.mutex);
+            for (int i = 0; i < TAM_TABLA_CONN; i++) {
+                ConnEntry *curr = tabla_conns.buckets[i];
+                while (curr != NULL) {
+                    enqueue_write(g_epfd, curr->conn, buf);
+                    curr = curr->next;
+                }
+            }
+            pthread_mutex_unlock(&tabla_conns.mutex);
+
+            eliminar_job_owner(job_id);
+        }
     }
     else if (strncmp(msg, "JOB_STATUS", 10) == 0) {
-        
+        int job_id;
+        if (sscanf(msg, "JOB_STATUS %d", &job_id) == 1) {
+            char buf[BUFF_SIZE];
+            if (tabla_jobs_get_conn(&manager.tabla, job_id) != NULL) {
+                snprintf(buf, sizeof(buf), "JOB_STATUS %d ACTIVE\n", job_id);
+            } else {
+                snprintf(buf, sizeof(buf), "JOB_STATUS %d UNKNOWN\n", job_id);
+            }
+            enqueue_write(g_epfd, conn, buf);
+        }
     }
     else {
-        fprintf(stderr, "Comando inválido\n");
+        fprintf(stderr, "Comando inválido: %s\n", msg);
     }
 
     return;
@@ -909,7 +1053,7 @@ void process_message(connection_t *conn, char *msg) {
  */
 void process_announce(const char *ip_sender, const char *message) {
     int puerto, cpu, mem, gpu;
-    int n = sscanf(message, "ANNOUNCE %*s %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
+    int n = sscanf(message, "ANNOUNCE %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
     if (n != 4) {
         fprintf(stderr, "ANNOUNCE mal formado: %s\n", message);
         return;
@@ -938,6 +1082,42 @@ void process_disconnect(connection_t *conn) {
 
     // Luego, para la tabla de jobs, es necesario eliminarlos de la tabla de Jobs
     tabla_jobs_delete_by_conn(&manager.tabla, conn);
+
+    // Limpiar el rastreador de dueños para evitar Use-After-Free
+    pthread_mutex_lock(&mutex_job_owners);
+    JobOwner *prev_o = NULL;
+    JobOwner *curr_o = job_owners;
+    while (curr_o != NULL) {
+        if (curr_o->conn == conn) {
+            JobOwner *next_o = curr_o->next;
+            if (prev_o == NULL) job_owners = next_o;
+            else prev_o->next = next_o;
+            free(curr_o);
+            curr_o = next_o;
+        } else {
+            prev_o = curr_o;
+            curr_o = curr_o->next;
+        }
+    }
+    pthread_mutex_unlock(&mutex_job_owners);
+
+    // Limpiar la sala de espera saliente
+    pthread_mutex_lock(&mutex_pendientes_salientes);
+    OutReq *prev_r = NULL;
+    OutReq *curr_r = pendientes_salientes;
+    while (curr_r != NULL) {
+        if (curr_r->conn == conn) {
+            OutReq *next_r = curr_r->next;
+            if (prev_r == NULL) pendientes_salientes = next_r;
+            else prev_r->next = next_r;
+            free(curr_r);
+            curr_r = next_r;
+        } else {
+            prev_r = curr_r;
+            curr_r = curr_r->next;
+        }
+    }
+    pthread_mutex_unlock(&mutex_pendientes_salientes);
 
     // Finalmente, se elimina la conexión de la tabla de nodos conectados
     tabla_conns_delete_by_conn(conn);
@@ -998,6 +1178,18 @@ void process_connection_failed(connection_t *conn) {
                 prev->next = next;
             }
             fprintf(stderr, "Conexion fallida hacia %s, descartando pedido: %s\n", curr->ip, curr->msg);
+            
+            // Le avisa a erlang que falló
+            int job_id;
+            if (sscanf(curr->msg, "RESERVE %d", &job_id) == 1) {
+                connection_t *owner = buscar_job_owner(job_id);
+                if (owner != NULL) {
+                    char buf[BUFF_SIZE];
+                    snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", job_id);
+                    enqueue_write(g_epfd, owner, buf);
+                }
+            }
+            
             free(curr);
             curr = next;
         } else {
