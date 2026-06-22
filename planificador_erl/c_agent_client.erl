@@ -1,177 +1,221 @@
 -module(c_agent_client).
 -export([start/0, map_gen/1, node_map/1, armar_lista/1]).
--export([get_list_maps/0, serverloop/3, armar_comando/1, job_handler/1]).
+-export([get_list_maps/1, masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2]).
 
 -define(PORT, 8000).
 -define(HOST, "localhost").
--define(GET_NODES, <<"GET_NODES">>).
+-define(GET_NODES, "GET_NODES\n").
 
 -define(RAFAGA, 4).
 
-% 1.22.312:1212:cpu:1:mem:2212:gpu:1
-% @ip
+% Arma la lista de pares que luego se utilizará para armar el mapa
 armar_lista(Node_listed) -> 
     case Node_listed of
         [] -> [];
-        ["host", Second, Third | Tail] -> [{"host", Second}] ++ armar_lista(Tail);
+        ["host", Second, _Third | Tail] -> [{"host", Second}] ++ armar_lista(Tail);
         [First, Second | Tail] -> [{First, Second}] ++ armar_lista(Tail)
-    end. % [{"host", <ip>}, {"cpu", <n_cpu>}, ...]
+    end.
 
-% Función auxiliar de generación de mapas
+% Función auxiliar de armado de mapas de nodos
 node_map(Node_listed) ->
     Node_paired = armar_lista(Node_listed),
     Map = maps:from_list(Node_paired),
     master ! Map,
-    done.
+    map_sent_master.
 
-% Generador de mapas para saber más facilmente
-% los recursos disponibles
-% Se generan a partir de una lista de nodos
-map_gen(Nodes) -> %hacer secuencial
+% Genera los mapas que representan los nodos
+map_gen(Nodes) ->
     case Nodes of
-        
         [] -> generation_done;
-        
         [Head | Tail] -> 
-            Head_listed = string:split(Head, <<":">>, all),
-            spawn(?MODULE, node_map, [["host"] ++ Head_listed]), % ["host", <ip>, <puerto>, "cpu", <n_cpu>, "mem", <mb_mem>, "gpu", <n_gpu>]
+            Head_listed = string:split(Head, ":", all),
+            spawn(?MODULE, node_map, [["host"] ++ Head_listed]),
             map_gen(Tail)
-
     end.
 
-% Arma la lista de mapas, donde cada uno representa un nodo
-get_list_maps() ->
-    
-    io:fwrite("Acomodando datos, espere...~n"), %%%
-    receive
-        Mapa -> [Mapa] ++ get_list_maps()
-
-        after
-        5000 -> maps_are_here
+% Recolector síncrono estricto por conteo de nodos
+get_list_maps(N) ->
+    case N of
+        0 -> [];
+        N ->
+            receive
+                Mapa -> [Mapa | get_list_maps(N - 1)]
+            end
     end.
 
-% Genera un número aleatorio desde 0 a N inclusive
-rand_desde_cero(N) ->
+% Similar a rand:uniform, pero desde 0 a N
+rand_desde_cero(N) -> 
     case N of
         0 -> 0;
         N -> rand:uniform(N + 1) - 1
     end.
 
-% Construye parte del comando de JOB_REQUEST que se enviará al agente C
+% Ordena los nodos según el valor de "host" (Estrategia anti-deadlock)
 armar_comando(Maps_list) ->
-    
-    case Maps_list of
-        
-        [Head] -> Rand_list = [rand_desde_cero(list_to_integer(maps:get("cpu", Head, "0"))),
-                        rand_desde_cero(list_to_integer(maps:get("mem", Head, "0"))),
-                        rand_desde_cero(list_to_integer(maps:get("gpu", Head, "0")))],
-            case Rand_list of
-                [0, 0, 0] -> "";
+    ListaOrdenada = lists:sort(
+        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
+        Maps_list
+    ),
+    armar_comando_ordenado(ListaOrdenada).
 
-                [First, Second, Third] -> 
-                    "@" ++ maps:get("host", Head) ++ "cpu" ++ 
-                    integer_to_list(First) ++ "mem" ++ 
-                    integer_to_list(Second) ++ "gpu" ++ 
-                    integer_to_list(Third)
-            end;
-        
+% Arma el comando una vez ordenada la lista de nodos
+armar_comando_ordenado(Maps_list) ->
+    case Maps_list of
+        [] -> "";
         [Head | Tail] ->
             Rand_list = [rand_desde_cero(list_to_integer(maps:get("cpu", Head, "0"))),
-                        rand_desde_cero(list_to_integer(maps:get("mem", Head, "0"))), % se trabaja con MB (multiplicar y dividir por 1024)
-                        rand_desde_cero(list_to_integer(maps:get("gpu", Head, "0")))],
+                         rand_desde_cero(list_to_integer(maps:get("mem", Head, "0"))),
+                         rand_desde_cero(list_to_integer(maps:get("gpu", Head, "0")))],
+
             case Rand_list of
-                [0, 0, 0] -> "" ++ armar_comando(Tail);
-
+                [0, 0, 0] -> "" ++ armar_comando_ordenado(Tail);
                 [First, Second, Third] -> 
-                    "@" ++ maps:get("host", Head) ++ "cpu" ++ 
-                    integer_to_list(First) ++ "mem" ++ 
-                    integer_to_list(Second) ++ "gpu" ++ 
-                    integer_to_list(Third) ++ " " ++ armar_comando(Tail)
+                    "@" ++ maps:get("host", Head) ++ ":cpu:" ++ integer_to_list(First) ++ 
+                    ":mem:" ++ integer_to_list(Second) ++ ":gpu:" ++ integer_to_list(Third) ++ 
+                    case Tail of 
+                        [] -> ""; 
+                        _ -> " " 
+                    end ++ armar_comando_ordenado(Tail)
             end
-    
-    end. % JOB_REQUEST job_id @host:res:amount:res:...
+    end.
 
-% Detiene la ejecución del programa por Ms milisegundos
+% Suspende la ejecución del programa por Ms milisegundos
 sleep(Ms) ->
+    receive 
+        after 
+            Ms -> go_on 
+    end.
 
+% Vigila el estado del job recibido como argumento
+job_handler(Job_id, Socket) ->
     receive
-        after
-            Ms -> ok
-    end.
-
-% Vigila el estado del job
-job_handler(Job_id) ->
-    todo.
-
-% loop principal del server (proceso master) luego de organizar la información de nodos
-% Después de N procesos, hay una pequeña pausa
-serverloop(Maps_list, Socket, N) ->
-    Comando = armar_comando(Maps_list),
-    case Comando of
-        "" -> nada;
-    
-        _ -> 
-            Job_id = erlang:unique_integer(),
-            ("JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando) ! Socket,
-            spawn(?MODULE, job_handler, [Job_id])
-    end,
-
-    case N of
-        0 -> 
+        granted ->
+            io:format("Job ~p trabajando...~n", [Job_id]),
             sleep(5000),
-            serverloop(Maps_list, Socket, ?RAFAGA);
-        
-        _ -> serverloop(Maps_list, Socket, N - 1)
-
+            gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n"),
+            io:format("Job ~p envió RELEASE~n", [Job_id]);
+        denied ->
+            io:format("Job ~p denegado~n", [Job_id]);
+        timeout ->
+            io:format("Job ~p expiró por timeout~n", [Job_id])
     end.
 
+% Dispara los 4 requests seguidos al socket en paralelo
+% También arma el map con los jobs solicitados sin respuesta del agente C
+disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
+    case Cantidad of
 
-% Función para conectar el agente C con el programa en Erlang
-% y recibir datos sobre nodos
+        0 -> HandlersMap;
+
+        Cantidad ->
+            Comando = armar_comando(Maps_list),
+            case Comando of
+                "" -> 
+                    disparar_rafaga(Maps_list, Socket, Cantidad - 1, HandlersMap);
+                _ ->
+                    Job_id = erlang:unique_integer([positive]), 
+                    gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando ++ "\n"),
+                    Pid = spawn(?MODULE, job_handler, [Job_id, Socket]),
+                    NewMap = maps:put(Job_id, Pid, HandlersMap),
+                    disparar_rafaga(Maps_list, Socket, Cantidad - 1, NewMap)
+            end
+    end.
+
+% Función para registrar eventos en un archivo físico de logs con estampa de tiempo
+registrar_log(JobId, Estado, Detalle) ->
+    {_, {H, Min, S}} = erlang:localtime(),
+    LogTexto = io_lib:format("[~.2.0w:~.2.0w:~.2.0w] [JOB ~p] [~s] -> ~s~n", [H, Min, S, JobId, Estado, Detalle]),
+    % Abre el archivo en modo append (agregar al final) y escribe de forma segura
+    file:write_file("planificador.log", LogTexto, [append]).
+
+% Loop principal del proceso master
+masterloop(Maps_list, Socket, HandlersMap) ->
+    % Si el mapa se vació, significa que la ráfaga anterior terminó. Disparamos otra.
+    MapConJobs = 
+        case maps:size(HandlersMap) of
+            0 -> 
+                sleep(2000), % Pausa para no saturar al Agente
+                disparar_rafaga(Maps_list, Socket, ?RAFAGA, HandlersMap);
+            _ -> 
+                HandlersMap
+        end,
+
+    % Recibimos respuesta al JOB_REQUEST y actuamos al respecto
+    case gen_tcp:recv(Socket, 0, 500) of
+        {ok, Linea} ->
+            {TipoMensaje, IdCrudo} = 
+                case Linea of
+                "JOB_GRANTED " ++ Resto -> {granted, Resto};
+                "JOB_DENIED " ++ Resto  -> {denied, Resto};
+                "JOB_TIMEOUT " ++ Resto -> {timeout, Resto};
+                _                       -> {desconocido, ""}
+                end,
+
+            case TipoMensaje of
+                desconocido ->
+                    masterloop(Maps_list, Socket, MapConJobs);
+                _ ->
+                    JobIdRecibido = list_to_integer(string:trim(IdCrudo)),
+                    case maps:find(JobIdRecibido, MapConJobs) of
+                        {ok, Destinatario} ->
+                            Destinatario ! TipoMensaje,
+
+                            % Sección de registro en log
+                            case TipoMensaje of
+                                granted -> registrar_log(JobIdRecibido, "GRANTED", "Recursos reservados correctamente.");
+                                denied  -> registrar_log(JobIdRecibido, "DENIED", "Reserva denegada.");
+                                timeout -> registrar_log(JobIdRecibido, "TIMEOUT", "Reserva expirada por timeout.")
+                            end,
+                            %%%%%%%
+
+                            CleanMap = maps:remove(JobIdRecibido, MapConJobs),
+                            masterloop(Maps_list, Socket, CleanMap);
+                        error ->
+                            masterloop(Maps_list, Socket, MapConJobs)
+                    end
+            end;
+
+        {error, timeout} ->
+            masterloop(Maps_list, Socket, MapConJobs);
+        
+        % Solo terminamos 
+        {error, Reason} ->
+            io:format("Error con el Agente C: ~p~n", [Reason])
+    end.
+
+% Función para iniciar el cliente de Erlang
 start() ->
-    rand:seed(exsp),
-    % 1. Conectamos con el agente
-    case gen_tcp:connect(?HOST, ?PORT, [binary, {packet, 0}, {active, false}]) of
+    rand:seed(exsp), % Similar a srand(time(NULL)) en C
+
+    % Nos conectamos al agente C
+    case gen_tcp:connect(?HOST, ?PORT, [list, {packet, 0}, {active, false}]) of
         {ok, Socket} ->
             io:format("Conectado al agente C en el puerto ~p~n", [?PORT]),
             register(master, self()),
             
-            %% 2. Solicitamos lista de nodos
+            % Solicitamos la información sobre nodos
             gen_tcp:send(Socket, ?GET_NODES),
-            io:format("Mensaje enviado: ~s~n", [?GET_NODES]),
+            io:format("Mensaje enviado: ~s", [?GET_NODES]),
             
-            %% 3. Esperar la respuesta de C (hasta 5 segundos)
-                % y recibir los datos
+            % La recibimos con un tiempo de espera máximo de 5 segundos
             case gen_tcp:recv(Socket, 0, 5000) of
-                "NODES " ++ Data ->
-                    io:format("Recibido: ~s~n", [Data]),
-                    Data_listed = string:split(Data, <<";">>, all), % Armamos una lista de los nodos
+                {ok, "NODES " ++ Data} ->
+                    Data_listed = string:split(Data, ";", all), 
                     map_gen(Data_listed), 
-                    Maps_list = get_list_maps(), % 4. Armamos una lista de mapas con host y n° de cpu, memoria y gpu
-                    serverloop(Maps_list, Socket, ?RAFAGA),
+                    
+                    % Armamos la lista de mapas para más comodidad en el manejo de datos
+                    % Cada mapa representa un nodo
+                    Maps_list = get_list_maps(length(Data_listed)), 
+                    io:format("Entrando a masterloop...~n"),
+                    
+                    % Arrancamos el masterloop con un mapa de jobs pendientes vacío #{}
+                    masterloop(Maps_list, Socket, #{}),
                     gen_tcp:close(Socket);
-
+                
                 _ ->
                     io:format("Error: No se pudo recibir la información sobre los nodos~n"),
-                    %io:format("Error: ~p~n", [Reason]),
                     gen_tcp:close(Socket)
             end;
-            
         {error, Reason} ->
             io:format("Conexión fallida: ~p~n", [Reason])
     end.
-
-%start() ->
-
-    %Conectarse al agente C y recibir nodos vivos en formato texto
-    %connection_set(),
-
-    %Consultar por la lista de nodos vivos en formato texto (GET_NODES)
-    %NODES 192.168.1.10:8100:cpu:4:mem:8192:gpu:1;192.168.1.11:8101:cpu:2:mem:4096
-    
-    %Lanzar simultáneamente jobs
-
-    %implementar estrategia antideadlock
-
-    %registrar concesiones, denegaciones y casos de deadlock en un log
-    %todo.

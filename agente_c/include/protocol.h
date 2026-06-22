@@ -42,6 +42,25 @@ typedef struct {
 
 typedef granted_msg_t denied_msg_t;
 
+/**
+ * Para los comandos como JOB_RELEASE, que se tienen que parsear, se crean sus mensajes acordes
+ */
+
+typedef granted_msg_t job_release_msg_t;
+
+typedef granted_msg_t job_status_msg_t;
+
+/**
+ * Por último, el comando ANNOUNCE tiene su propio elemento
+ */
+typedef struct {
+    bool valido;
+    int puerto;
+    int cpu;
+    int mem;
+    int gpu;
+} announce_msg_t;
+
 reserve_msg_t parse_reserve(const char* msg);
 
 release_msg_t parse_release(const char* msg);
@@ -53,5 +72,11 @@ denied_msg_t parse_denied(const char* msg);
 job_request_t parse_job_request(const char* buf);
 
 void resource_list_destroy(resource_request_t *list);
+
+job_release_msg_t parse_job_release(const char* msg);
+
+job_status_msg_t parse_job_status(const char* msg);
+
+announce_msg_t parse_announce(const char* msg);
 
 #endif
