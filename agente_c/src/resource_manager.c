@@ -867,6 +867,7 @@ void process_message(connection_t *conn, char *msg) {
                 tabla_jobs_insert(&manager.tabla, conn, result.job_id, result.type, result.amount);
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
+                printf("%s", buf); //
                 enqueue_write(g_epfd, conn, buf);
             }
         }
@@ -1055,6 +1056,7 @@ void process_message(connection_t *conn, char *msg) {
             tabla_jobs_remove(&manager.tabla, result.job_id);
             
             eliminar_job_owner(result.job_id);
+            printf("llegue\n"); //
         }
         else {
             fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
