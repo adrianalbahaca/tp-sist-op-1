@@ -152,7 +152,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
     after 1 -> 
         % Si no hay liberaciones internas, escuchamos lo que llega de la red (Agente C)
         io:format("ESPERANDO~n"),
-        case gen_tcp:recv(Socket, 0, 500) of
+        case gen_tcp:recv(Socket, 0, 5000) of
             {ok, LineaConSalto} ->
                 % Removemos el \n del protocolo antes de procesar nada
                 Linea = string:trim(LineaConSalto, trailing, "\n"),

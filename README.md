@@ -102,3 +102,5 @@ make all
 cd planificador_erl/src
 erlc *.erl
 erl -noshell -s scheduler_main start -s init stop
+
+./agente 10.0.0.20 8000 2 4096 1
