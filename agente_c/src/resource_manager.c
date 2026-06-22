@@ -6,6 +6,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <time.h>
 #include "../include/resource_types.h"
 
 #define TAM_TABLA_JOBS 71 // Se selecciona un numero primo chico por cuestiones de optimización
@@ -16,6 +17,8 @@ typedef enum {
     RM_QUEUED,
     RM_DENIED
 } result_t;
+
+static void release_resource(resource_t tipo, int amount);
 
 // La tabla de jobs será una tabla hash con función de hasheo simple
 typedef struct Allocation {
@@ -75,12 +78,74 @@ typedef struct {
     pthread_mutex_t mutex;
 } TablaConns;
 
+typedef struct NodeEntry {
+    char ip[16];
+    int puerto;
+    int cpu_disp, mem_disp, gpu_disp;
+    time_t last_seen;
+    struct NodeEntry *next;
+} NodeEntry;
+
+typedef struct {
+    NodeEntry *buckets[TAM_TABLA_CONN];
+    pthread_mutex_t mutex;
+} TablaNodos;
+
+typedef struct OutReq {
+    connection_t *conn;
+    char msg[BUFF_SIZE];
+    char ip[16];
+    struct OutReq *next;
+} OutReq;
+
+static OutReq *pendientes_salientes = NULL;
+static pthread_mutex_t mutex_pendientes_salientes = PTHREAD_MUTEX_INITIALIZER;
+
+/**
+ * Registro simple job_id -> conn original, para poder reenviar GRANTED/DENIED
+ * que llegan de nodos remotos hacia quien hizo el JOB_REQUEST.
+ */
+typedef struct JobOwner {
+    int job_id;
+    connection_t *conn;
+    struct JobOwner *next;
+} JobOwner;
+
+static JobOwner *job_owners = NULL;
+static pthread_mutex_t mutex_job_owners = PTHREAD_MUTEX_INITIALIZER;
+
+static void registrar_job_owner(int job_id, connection_t *conn) {
+    pthread_mutex_lock(&mutex_job_owners);
+    JobOwner *o = malloc(sizeof(JobOwner));
+    o->job_id = job_id;
+    o->conn = conn;
+    o->next = job_owners;
+    job_owners = o;
+    pthread_mutex_unlock(&mutex_job_owners);
+}
+
+static connection_t* buscar_job_owner(int job_id) {
+    pthread_mutex_lock(&mutex_job_owners);
+    JobOwner *curr = job_owners;
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            connection_t *c = curr->conn;
+            pthread_mutex_unlock(&mutex_job_owners);
+            return c;
+        }
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&mutex_job_owners);
+    return NULL;
+}
+
 /**
  * El gestor de recursos se define estáticamente para trabajar con memoria dinámica lo menos posible y evitar complicaciones
  */
 static ResourceManager manager;
 
 static TablaConns tabla_conns;
+static TablaNodos tabla_nodos;
 
 /**
  * Se ajusta el epoll local para que lo use el manager
@@ -249,6 +314,26 @@ static bool buscar_job_tabla(Job *j, int job_id) {
     return false;
 }
 
+/**
+ * Busca el conn original asociado a un job_id, sin importar el bucket.
+ * Devuelve NULL si no se encuentra.
+ */
+static connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
+    pthread_mutex_lock(&j->mutex);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+    Job *curr = j->tabla_jobs[idx];
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            connection_t *c = curr->conn;
+            pthread_mutex_unlock(&j->mutex);
+            return c;
+        }
+        curr = curr->sig;
+    }
+    pthread_mutex_unlock(&j->mutex);
+    return NULL;
+}
+
 static void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount) {
     pthread_mutex_lock(&j->mutex);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
@@ -308,6 +393,7 @@ static void tabla_jobs_remove(TablaJobs *j, int job_id) {
                 free(all);
                 all = sig;
             }
+            free(start);
             break;
         }
         prev = start;
@@ -318,10 +404,57 @@ static void tabla_jobs_remove(TablaJobs *j, int job_id) {
 }
 
 /**
+ * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos
+ * (vía release_resource, que SÍ toma su propio lock) y elimina los jobs.
+ * NO se llama con j->mutex tomado, porque release_resource necesita tomar
+ * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
+ */
+static void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
+    pthread_mutex_lock(&j->mutex);
+    for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
+        Job *prev = NULL;
+        Job *curr = j->tabla_jobs[idx];
+
+        while (curr != NULL) {
+            Job *next = curr->sig;
+
+            if (curr->conn == conn) {
+                if (prev == NULL) {
+                    j->tabla_jobs[idx] = next;
+                } else {
+                    prev->sig = next;
+                }
+
+                Allocation *all = curr->allocations;
+                while (all != NULL) {
+                    Allocation *sig = all->sig;
+                    release_resource(all->name, all->amount);
+                    free(all);
+                    all = sig;
+                }
+                free(curr);
+                curr = next;
+            } else {
+                prev = curr;
+                curr = next;
+            }
+        }
+    }
+    pthread_mutex_unlock(&j->mutex);
+    return;
+}
+
+/**
  * =====================================================================================
  * Funciones de Recurso
  * =====================================================================================
  */
+
+static const char* resource_type_to_str(resource_t tipo) {
+    if (tipo == RESOURCE_CPU) return "cpu";
+    if (tipo == RESOURCE_MEM) return "mem";
+    return "gpu";
+}
 
 // Atiende una orden RESERVE y devuelve una respuesta acorde
 static result_t reserve_resource (resource_t tipo, int amount, int job_id, connection_t *conn) {
@@ -494,6 +627,92 @@ void tabla_conns_destroy() {
 
 /**
  * ======================================================================================
+ * Funciones de la tabla de nodos conocidos (vía UDP ANNOUNCE)
+ * ======================================================================================
+ */
+void tabla_nodos_init() {
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        tabla_nodos.buckets[i] = NULL;
+    }
+    pthread_mutex_init(&tabla_nodos.mutex, NULL);
+    return;
+}
+
+/**
+ * Si la IP ya existe en la tabla, actualiza sus datos (recursos, timestamp).
+ * Si no existe, crea una entrada nueva.
+ */
+void tabla_nodos_insert_or_update(const char *ip, int puerto, int cpu, int mem, int gpu) {
+    pthread_mutex_lock(&tabla_nodos.mutex);
+    unsigned int idx = hash_ip(ip);
+
+    NodeEntry *curr = tabla_nodos.buckets[idx];
+    while (curr != NULL) {
+        if (strcmp(curr->ip, ip) == 0) {
+            curr->puerto = puerto;
+            curr->cpu_disp = cpu;
+            curr->mem_disp = mem;
+            curr->gpu_disp = gpu;
+            curr->last_seen = time(NULL);
+            pthread_mutex_unlock(&tabla_nodos.mutex);
+            return;
+        }
+        curr = curr->next;
+    }
+
+    // No existía, se crea una entrada nueva
+    NodeEntry *nuevo = malloc(sizeof(NodeEntry));
+    strncpy(nuevo->ip, ip, sizeof(nuevo->ip) - 1);
+    nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
+    nuevo->puerto = puerto;
+    nuevo->cpu_disp = cpu;
+    nuevo->mem_disp = mem;
+    nuevo->gpu_disp = gpu;
+    nuevo->last_seen = time(NULL);
+    nuevo->next = tabla_nodos.buckets[idx];
+    tabla_nodos.buckets[idx] = nuevo;
+
+    pthread_mutex_unlock(&tabla_nodos.mutex);
+    return;
+}
+
+/**
+ * Busca el puerto asociado a una IP conocida. Devuelve -1 si no se encontró.
+ */
+int tabla_nodos_get_puerto(const char *ip) {
+    pthread_mutex_lock(&tabla_nodos.mutex);
+    unsigned int idx = hash_ip(ip);
+
+    NodeEntry *curr = tabla_nodos.buckets[idx];
+    while (curr != NULL) {
+        if (strcmp(curr->ip, ip) == 0) {
+            int puerto = curr->puerto;
+            pthread_mutex_unlock(&tabla_nodos.mutex);
+            return puerto;
+        }
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&tabla_nodos.mutex);
+    return -1;
+}
+
+void tabla_nodos_destroy() {
+    pthread_mutex_lock(&tabla_nodos.mutex);
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        NodeEntry *next;
+        while (tabla_nodos.buckets[i] != NULL) {
+            next = tabla_nodos.buckets[i]->next;
+            free(tabla_nodos.buckets[i]);
+            tabla_nodos.buckets[i] = next;
+        }
+    }
+    pthread_mutex_unlock(&tabla_nodos.mutex);
+    pthread_mutex_destroy(&tabla_nodos.mutex);
+    return;
+}
+
+/**
+ * ======================================================================================
  * Funciones de Resource Manager
  * ======================================================================================
  */
@@ -504,7 +723,9 @@ void manager_init(int cpu, int mem, int gpu) {
     manager.recursos[RESOURCE_MEM].available_amount = manager.recursos[RESOURCE_MEM].total_amount = mem;
     manager.recursos[RESOURCE_GPU].available_amount = manager.recursos[RESOURCE_GPU].total_amount = gpu;
     
-    table_init(&manager.tabla);
+    tabla_jobs_init(&manager.tabla);
+    tabla_conns_init();
+    tabla_nodos_init();
 
     queue_init(&manager.recursos[RESOURCE_CPU].cola);
     queue_init(&manager.recursos[RESOURCE_MEM].cola);
@@ -531,7 +752,9 @@ void manager_destroy() {
     queue_destroy(&manager.recursos[RESOURCE_GPU].cola);
     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-    table_destroy(&manager.tabla);
+    tabla_jobs_destroy(&manager.tabla);
+    tabla_conns_destroy();
+    tabla_nodos_destroy();
 
     pthread_mutex_destroy(&manager.recursos[RESOURCE_CPU].mutex);
     pthread_mutex_destroy(&manager.recursos[RESOURCE_MEM].mutex);
@@ -576,9 +799,12 @@ void process_message(connection_t *conn, char *msg) {
 
         if (result.valido) {
             fprintf(stderr, "GRANTED recibido del job %d\n", result.job_id);
-            /**
-             * TODO: Una vez se tenga la orquestación multi-nodo, se envía al nodo correspondiente
-             */
+            connection_t *owner = buscar_job_owner(result.job_id);
+            if (owner != NULL) {
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "GRANTED %d", result.job_id);
+                enqueue_write(g_epfd, owner, buf);
+            }
         }
         else {
             fprintf(stderr, "GRANTED mal formado: %s\n", msg);
@@ -589,9 +815,12 @@ void process_message(connection_t *conn, char *msg) {
 
         if (result.valido) {
             fprintf(stderr, "DENIED recibido del job %d\n", result.job_id);
-            /**
-             * TODO: Una vez se tenga la orquestación multi-nodo, se envía al nodo correspondiente
-             */
+            connection_t *owner = buscar_job_owner(result.job_id);
+            if (owner != NULL) {
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "DENIED %d", result.job_id);
+                enqueue_write(g_epfd, owner, buf);
+            }
         }
         else {
             fprintf(stderr, "DENIED mal formado: %s\n", msg);
@@ -609,16 +838,53 @@ void process_message(connection_t *conn, char *msg) {
 
         while (list != NULL) {
             if (strcmp(list->ip, g_ip) == 0) {
-                reserve_resource(list->type, list->amount, result.job_id, conn);
+                result_t r = reserve_resource(list->type, list->amount, result.job_id, conn);
+                if (r == RM_GRANTED) {
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, list->type, list->amount);
+                    char buf[BUFF_SIZE];
+                    snprintf(buf, sizeof(buf), "GRANTED %d", result.job_id);
+                    enqueue_write(g_epfd, conn, buf);
+                }
             }
             else {
-                /**
-                 * TODO: Enviar esta solicitud a cada nodo que queremos conectarnos
-                 */
+                char mensaje[BUFF_SIZE];
+                snprintf(mensaje, sizeof(mensaje), "RESERVE %d %s %d",
+                         result.job_id, resource_type_to_str(list->type), list->amount);
+
+                connection_t *remote = tabla_conns_lookup(list->ip);
+                if (remote != NULL) {
+                    // Ya hay conexión activa con ese nodo, mandar directo
+                    registrar_job_owner(result.job_id, conn);
+                    enqueue_write(g_epfd, remote, mensaje);
+                } else {
+                    // No hay conexión activa: buscar el puerto y conectar
+                    int puerto = tabla_nodos_get_puerto(list->ip);
+                    if (puerto == -1) {
+                        fprintf(stderr, "JOB_REQUEST: nodo %s desconocido, no se puede contactar\n", list->ip);
+                    } else {
+                        connection_t *nueva = connect_remote_node(g_epfd, list->ip, puerto);
+                        if (nueva != NULL) {
+                            registrar_job_owner(result.job_id, conn);
+                            // Encolar el mensaje pendiente hasta que la conexión esté lista
+                            OutReq *req = malloc(sizeof(OutReq));
+                            req->conn = nueva;
+                            strncpy(req->msg, mensaje, sizeof(req->msg) - 1);
+                            req->msg[sizeof(req->msg) - 1] = '\0';
+                            strncpy(req->ip, list->ip, sizeof(req->ip) - 1);
+                            req->ip[sizeof(req->ip) - 1] = '\0';
+
+                            pthread_mutex_lock(&mutex_pendientes_salientes);
+                            req->next = pendientes_salientes;
+                            pendientes_salientes = req;
+                            pthread_mutex_unlock(&mutex_pendientes_salientes);
+                        }
+                    }
+                }
             }
             list = list->next;
         }
     }
+
     return;
 }
 
@@ -627,6 +893,13 @@ void process_message(connection_t *conn, char *msg) {
  * Para agregarlo a los conocidos.
  */
 void process_announce(const char *ip_sender, const char *message) {
+    int puerto, cpu, mem, gpu;
+    int n = sscanf(message, "ANNOUNCE %*s %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
+    if (n != 4) {
+        fprintf(stderr, "ANNOUNCE mal formado: %s\n", message);
+        return;
+    }
+    tabla_nodos_insert_or_update(ip_sender, puerto, cpu, mem, gpu);
     return;
 }
 
@@ -636,9 +909,17 @@ void process_announce(const char *ip_sender, const char *message) {
  */
 void process_disconnect(connection_t *conn) {
     // Primero, para cada uno de los recursos, es necesario liberarlo de la cola
+    pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
     queue_delete_by_conn(&manager.recursos[RESOURCE_CPU].cola, conn);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+    pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
     queue_delete_by_conn(&manager.recursos[RESOURCE_MEM].cola, conn);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+    pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
     queue_delete_by_conn(&manager.recursos[RESOURCE_GPU].cola, conn);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
     // Luego, para la tabla de jobs, es necesario eliminarlos de la tabla de Jobs
     tabla_jobs_delete_by_conn(&manager.tabla, conn);
@@ -653,6 +934,32 @@ void process_disconnect(connection_t *conn) {
  * Acá el Gestor de Estado ya puede llamar a enqueue_write con sus peticiones.
  */
 void process_connection_ready(connection_t *conn) {
+    pthread_mutex_lock(&mutex_pendientes_salientes);
+
+    OutReq *prev = NULL;
+    OutReq *curr = pendientes_salientes;
+
+    while (curr != NULL) {
+        OutReq *next = curr->next;
+
+        if (curr->conn == conn) {
+            if (prev == NULL) {
+                pendientes_salientes = next;
+            } else {
+                prev->next = next;
+            }
+
+            tabla_conns_insert(curr->ip, conn);
+            enqueue_write(g_epfd, conn, curr->msg);
+            free(curr);
+            curr = next;
+        } else {
+            prev = curr;
+            curr = next;
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_pendientes_salientes);
     return;
 }
 
@@ -661,5 +968,29 @@ void process_connection_ready(connection_t *conn) {
  * El Gestor de Estado debe abortar su plan y quizás buscar otro nodo.
  */
 void process_connection_failed(connection_t *conn) {
+    pthread_mutex_lock(&mutex_pendientes_salientes);
+
+    OutReq *prev = NULL;
+    OutReq *curr = pendientes_salientes;
+
+    while (curr != NULL) {
+        OutReq *next = curr->next;
+
+        if (curr->conn == conn) {
+            if (prev == NULL) {
+                pendientes_salientes = next;
+            } else {
+                prev->next = next;
+            }
+            fprintf(stderr, "Conexion fallida hacia %s, descartando pedido: %s\n", curr->ip, curr->msg);
+            free(curr);
+            curr = next;
+        } else {
+            prev = curr;
+            curr = next;
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_pendientes_salientes);
     return;
 }
