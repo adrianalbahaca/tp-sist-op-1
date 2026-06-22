@@ -884,6 +884,15 @@ void process_message(connection_t *conn, char *msg) {
             list = list->next;
         }
     }
+    else if (strncmp(msg, "GET_NODES", 9) == 0) {
+
+    }
+    else if (strncmp(msg, "ANNOUNCE", 8) == 0) {
+
+    }
+    else {
+        fprintf(stderr, "Comando inválido\n");
+    }
 
     return;
 }

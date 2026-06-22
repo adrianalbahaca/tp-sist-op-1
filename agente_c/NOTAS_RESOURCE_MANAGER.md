@@ -26,4 +26,4 @@
   - mutex_pendientes_salientes, mutex_job_owners
   - Orden de adquisición usado: TablaJobs -> Recurso (nunca al revés). 
     Si agregan código nuevo que toque varios mutex a la vez, mantener ese orden
-    para evitar deadlocks.
+    para evitar deadlocks. 
