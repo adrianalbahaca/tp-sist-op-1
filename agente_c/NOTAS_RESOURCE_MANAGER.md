@@ -11,6 +11,8 @@
   el JOB_REQUEST (tabla job_owners)
 
 ## Qué falta / qué revisar
+- JOB_RELEASE - Falta implementarlo
+- JOB_STATUS - Falta implementarlo
 - GET_NODES (que Erlang pide para listar nodos) — no está implementado todavía
 - timerfd / timeouts en reservas pendientes — no implementado (es opcional según el TP)
 - tabla_jobs_remove tiene una variable sin usar (warning), revisar si hace falta

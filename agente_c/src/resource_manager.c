@@ -890,6 +890,12 @@ void process_message(connection_t *conn, char *msg) {
     else if (strncmp(msg, "ANNOUNCE", 8) == 0) {
 
     }
+    else if (strncmp(msg, "JOB_RELEASE", 11) == 0) {
+
+    }
+    else if (strncmp(msg, "JOB_STATUS", 10) == 0) {
+        
+    }
     else {
         fprintf(stderr, "Comando inválido\n");
     }
