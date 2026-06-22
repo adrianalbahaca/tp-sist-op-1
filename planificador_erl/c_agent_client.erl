@@ -121,6 +121,13 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
             end
     end.
 
+% Función para registrar eventos en un archivo físico de logs con estampa de tiempo
+registrar_log(JobId, Estado, Detalle) ->
+    {_, {H, Min, S}} = erlang:localtime(),
+    LogTexto = io_lib:format("[~.2.0w:~.2.0w:~.2.0w] [JOB ~p] [~s] -> ~s~n", [H, Min, S, JobId, Estado, Detalle]),
+    % Abre el archivo en modo append (agregar al final) y escribe de forma segura
+    file:write_file("planificador.log", LogTexto, [append]).
+
 % Loop principal del proceso master
 masterloop(Maps_list, Socket, HandlersMap) ->
     % Si el mapa se vació, significa que la ráfaga anterior terminó. Disparamos otra.
@@ -152,6 +159,15 @@ masterloop(Maps_list, Socket, HandlersMap) ->
                     case maps:find(JobIdRecibido, MapConJobs) of
                         {ok, Destinatario} ->
                             Destinatario ! TipoMensaje,
+
+                            % Sección de registro en log
+                            case TipoMensaje of
+                                granted -> registrar_log(JobIdRecibido, "GRANTED", "Recursos reservados correctamente.");
+                                denied  -> registrar_log(JobIdRecibido, "DENIED", "Reserva denegada.");
+                                timeout -> registrar_log(JobIdRecibido, "TIMEOUT", "Reserva expirada por timeout.")
+                            end,
+                            %%%%%%%
+
                             CleanMap = maps:remove(JobIdRecibido, MapConJobs),
                             masterloop(Maps_list, Socket, CleanMap);
                         error ->
