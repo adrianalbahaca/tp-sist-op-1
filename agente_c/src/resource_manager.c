@@ -1006,20 +1006,18 @@ void process_message(connection_t *conn, char *msg) {
         enqueue_write(g_epfd, conn, buf);
     }
     else if (strncmp(msg, "ANNOUNCE", 8) == 0) {
-        // En process anounce
+        /**
+         * Esta parte fue hecha en process_announce, por lo que no es necesaria, pero se mantiene acá por completitud
+         */
     }
     else if (strncmp(msg, "JOB_RELEASE", 11) == 0) {
-        /**
-         * TODO: Hacer función de parseo que verifique el formato de este comando
-         */
-        int job_id;
-        if (sscanf(msg, "JOB_RELEASE %d", &job_id) == 1) {
-            
-            tabla_jobs_remove(&manager.tabla, job_id);
+        job_release_msg_t result = parse_job_release(msg);
+        if (result.valido) {
+            tabla_jobs_remove(&manager.tabla, result.job_id);
 
             char buf[BUFF_SIZE];
             snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
-                     job_id, job_id, job_id);
+                     result.job_id, result.job_id, result.job_id);
 
             pthread_mutex_lock(&tabla_conns.mutex);
             for (int i = 0; i < TAM_TABLA_CONN; i++) {
@@ -1031,22 +1029,28 @@ void process_message(connection_t *conn, char *msg) {
             }
             pthread_mutex_unlock(&tabla_conns.mutex);
 
-            eliminar_job_owner(job_id);
+            eliminar_job_owner(result.job_id);
+        }
+        else {
+            fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
         }
     }
     else if (strncmp(msg, "JOB_STATUS", 10) == 0) {
         /**
          * TODO: Hacer función de parseo que verifique el parseo de este comando
          */
-        int job_id;
-        if (sscanf(msg, "JOB_STATUS %d", &job_id) == 1) {
+        job_status_msg_t result = parse_job_status(msg);
+        if (result.valido) {
             char buf[BUFF_SIZE];
-            if (tabla_jobs_get_conn(&manager.tabla, job_id) != NULL) {
-                snprintf(buf, sizeof(buf), "JOB_STATUS %d ACTIVE\n", job_id);
+            if (tabla_jobs_get_conn(&manager.tabla, result.job_id) != NULL) {
+                snprintf(buf, sizeof(buf), "JOB_STATUS %d ACTIVE\n", result.job_id);
             } else {
-                snprintf(buf, sizeof(buf), "JOB_STATUS %d UNKNOWN\n", job_id);
+                snprintf(buf, sizeof(buf), "JOB_STATUS %d UNKNOWN\n", result.job_id);
             }
             enqueue_write(g_epfd, conn, buf);
+        }
+        else {
+            fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
         }
     }
     else {
@@ -1061,13 +1065,14 @@ void process_message(connection_t *conn, char *msg) {
  * Para agregarlo a los conocidos.
  */
 void process_announce(const char *ip_sender, const char *message) {
-    int puerto, cpu, mem, gpu;
-    int n = sscanf(message, "ANNOUNCE %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
-    if (n != 4) {
+    /**
+     * TODO: Hacer función de parseo acá
+     */
+    announce_msg_t result = parse_announce(message);
+    if (result.valido)
+        tabla_nodos_insert_or_update(ip_sender, result.puerto, result.cpu, result.mem, result.gpu);
+    else
         fprintf(stderr, "ANNOUNCE mal formado: %s\n", message);
-        return;
-    }
-    tabla_nodos_insert_or_update(ip_sender, puerto, cpu, mem, gpu);
     return;
 }
 

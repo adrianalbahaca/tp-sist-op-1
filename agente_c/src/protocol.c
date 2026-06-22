@@ -197,3 +197,56 @@ job_request_t parse_job_request(const char* buf) {
     return result;
 
 }
+
+job_release_msg_t parse_job_release(const char* msg) {
+    job_status_msg_t result;
+    result.valido = false;
+
+    // Parsear mensaje
+    int job_id;
+    if (sscanf(msg, "JOB_RELEASE %d", &job_id) != 1) {
+        return result;
+    }
+
+    result.job_id = job_id;
+    result.valido = true;
+
+    return result;
+}
+
+job_status_msg_t parse_job_status(const char* msg) {
+    job_status_msg_t result;
+    result.valido = false;
+
+    // Parsear mensaje
+    int job_id;
+    if (sscanf(msg, "JOB_STATUS %d", &job_id) != 1) {
+        return result;
+    }
+
+    result.job_id = job_id;
+    result.valido = true;
+
+    return result;
+}
+
+announce_msg_t parse_announce(const char* msg) {
+    announce_msg_t result;
+    result.valido = false;
+
+    // Parsear el mensaje
+    int puerto, cpu, mem, gpu;
+    int n = sscanf(msg, "ANNOUNCE %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
+    if (n != 4) {
+        fprintf(stderr, "ANNOUNCE mal formado: %s\n", msg);
+        return result;
+    }
+
+    result.cpu = cpu;
+    result.mem = mem;
+    result.gpu = gpu;
+    result.puerto = puerto;
+    result.valido = true;
+
+    return result;
+}
