@@ -1,4 +1,5 @@
 #include "../include/server.h"
+#include "../include/resource_manager.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,36 +14,6 @@
 #include <sys/socket.h>
 
 #include <pthread.h>
-
-/**
- * Dentro de handle_tcp_read, luego de cambiar (\n) por (\0).
- * Debe decidir qué hacer con el mensaje, si RESERVE, RELEASE, etc.
- */
-extern void process_message(connection_t *conn, char *msg);
-
-
-/**
- * Dentro de handle_udp_read, por cada datagrama que llega al socket UDP.
- * Para agregarlo a los conocidos.
- */
-extern void process_announce(const char *ip_sender, const char *message);
-
-/**
- * Llamar antes de destruir el socket
- */
-extern void process_disconnect(connection_t *conn);
-
-/**
- * Se llama cuando un connect_remote_node finaliza con éxito.
- * Acá el Gestor de Estado ya puede llamar a enqueue_write con sus peticiones.
- */
-extern void process_connection_ready(connection_t *conn);
-
-/**
- * Se llama si connect_remote_node falló (ej. el nodo B estaba apagado).
- * El Gestor de Estado debe abortar su plan y quizás buscar otro nodo.
- */
-extern void process_connection_failed(connection_t *conn);
 
 /**
  * O_NONBLOCK para que retorne automáticamente y no se bloquee al hacer read, 
