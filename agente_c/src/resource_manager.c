@@ -974,6 +974,9 @@ void process_message(connection_t *conn, char *msg) {
         resource_list_destroy(result.request_list);
     }
     else if (strncmp(msg, "GET_NODES", 9) == 0) {
+        /**
+         * TODO: Hacer funciones que verifican el parseo para este elemento y conservar este proceso
+         */
         char buf[BUFF_SIZE];
         strcpy(buf, "NODES ");
         
@@ -1006,6 +1009,9 @@ void process_message(connection_t *conn, char *msg) {
         // En process anounce
     }
     else if (strncmp(msg, "JOB_RELEASE", 11) == 0) {
+        /**
+         * TODO: Hacer función de parseo que verifique el formato de este comando
+         */
         int job_id;
         if (sscanf(msg, "JOB_RELEASE %d", &job_id) == 1) {
             
@@ -1029,6 +1035,9 @@ void process_message(connection_t *conn, char *msg) {
         }
     }
     else if (strncmp(msg, "JOB_STATUS", 10) == 0) {
+        /**
+         * TODO: Hacer función de parseo que verifique el parseo de este comando
+         */
         int job_id;
         if (sscanf(msg, "JOB_STATUS %d", &job_id) == 1) {
             char buf[BUFF_SIZE];
