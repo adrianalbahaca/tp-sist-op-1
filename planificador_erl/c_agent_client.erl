@@ -206,9 +206,9 @@ start() ->
                     % Armamos la lista de mapas para más comodidad en el manejo de datos
                     % Cada mapa representa un nodo
                     Maps_list = get_list_maps(length(Data_listed)), 
-                    io:format("Entrando a serverloop...~n"),
+                    io:format("Entrando a masterloop...~n"),
                     
-                    % Arrancamos el serverloop con un mapa de jobs pendientes vacío #{}
+                    % Arrancamos el masterloop con un mapa de jobs pendientes vacío #{}
                     masterloop(Maps_list, Socket, #{}),
                     gen_tcp:close(Socket);
                 
