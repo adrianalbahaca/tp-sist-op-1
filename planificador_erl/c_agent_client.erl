@@ -13,6 +13,7 @@ armar_lista(Node_listed) ->
     case Node_listed of
         [] -> [];
         ["host", Second, _Third | Tail] -> [{"host", Second}] ++ armar_lista(Tail);
+        ["gpu", Second | Tail] -> [{"gpu", string:trim(Second)}] ++ armar_lista(Tail);
         [First, Second | Tail] -> [{First, Second}] ++ armar_lista(Tail)
     end.
 
@@ -141,16 +142,18 @@ masterloop(Maps_list, Socket, HandlersMap) ->
         end,
 
     % Recibimos respuesta al JOB_REQUEST y actuamos al respecto
+    io:format("ESTOY ESPERANDOOOOO...~n"),
     case gen_tcp:recv(Socket, 0, 500) of
         {ok, Linea} ->
+            io:format("Linea recibida: ~s~n", [Linea]),
             {TipoMensaje, IdCrudo} = 
                 case Linea of
-                "JOB_GRANTED " ++ Resto -> {granted, Resto};
-                "JOB_DENIED " ++ Resto  -> {denied, Resto};
-                "JOB_TIMEOUT " ++ Resto -> {timeout, Resto};
+                "JOB_GRANTED " ++ Resto -> {granted, string:trim(Resto)};
+                "JOB_DENIED " ++ Resto  -> {denied, string:trim(Resto)};
+                "JOB_TIMEOUT " ++ Resto -> {timeout, string:trim(Resto)};
                 _                       -> {desconocido, ""}
                 end,
-
+            io:format("hola~n"), %%
             case TipoMensaje of
                 desconocido ->
                     masterloop(Maps_list, Socket, MapConJobs);
@@ -178,7 +181,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
         {error, timeout} ->
             masterloop(Maps_list, Socket, MapConJobs);
         
-        % Solo terminamos 
+        % Solo terminamos si hay un error distinto de timeout
         {error, Reason} ->
             io:format("Error con el Agente C: ~p~n", [Reason])
     end.
