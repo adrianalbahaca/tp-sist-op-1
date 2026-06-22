@@ -146,20 +146,22 @@ static void eliminar_job_owner(int job_id) {
 
     while (curr != NULL) {
         if (curr->job_id == job_id) {
+            JobOwner *to_delete = curr;
             if (prev == NULL) {
                 job_owners = curr->next;
+                curr = job_owners;
             } else {
                 prev->next = curr->next;
+                curr = prev->next;
             }
-            free(curr);
-            break;
+            free(to_delete);
+        } else {
+            prev = curr;
+            curr = curr->next;
         }
-        prev = curr;
-        curr = curr->next;
     }
     pthread_mutex_unlock(&mutex_job_owners);
 }
-
 
 /**
  * El gestor de recursos se define estáticamente para trabajar con memoria dinámica lo menos posible y evitar complicaciones
@@ -234,6 +236,24 @@ static void queue_delete_by_conn(ColaPendingRequest *c, connection_t *conn) {
             curr = next;
         }
         else {
+            prev = curr;
+            curr = next;
+        }
+    }
+}
+
+static void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
+    PendingRequest *curr = c->top;
+    PendingRequest *prev = NULL;
+    while (curr != NULL) {
+        PendingRequest *next = curr->sig;
+        if (curr->job_id == job_id) {
+            if (prev == NULL) c->top = next;
+            else prev->sig = next;
+            if (c->bottom == curr) c->bottom = prev;
+            free(curr);
+            curr = next; 
+        } else {
             prev = curr;
             curr = next;
         }
@@ -395,36 +415,40 @@ static void tabla_jobs_remove(TablaJobs *j, int job_id) {
     pthread_mutex_lock(&j->mutex);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
-    // Recorrer y eliminar de la lista
     Job *prev = NULL;
     Job *start = j->tabla_jobs[idx];
 
+    Allocation *allocs_to_release = NULL;
+
     while (start != NULL) {
         if (start->job_id == job_id) {
-            // Si es al principio de la lista, es cuestión de actualizar punteros y eliminar
+            // Desenlazar el Job de la tabla
             if (prev == NULL) {
                 j->tabla_jobs[idx] = start->sig;
-            }
-            else {
+            } else {
                 prev->sig = start->sig;
             }
             
-            // Eliminar elementos de la lista de Allocations
-            Allocation * all = start->allocations;
-            Allocation *sig;
-            while (all != NULL) {
-                sig = all->sig;
-                release_resource(all->name, all->amount);
-                free(all);
-                all = sig;
-            }
+            // Extraer la lista de asignaciones antes de liberar el Job
+            allocs_to_release = start->allocations;
             free(start);
             break;
         }
         prev = start;
         start = start->sig;
     }
+    // IMPORTANTE: Soltar el lock de la tabla ANTES de invocar a release_resource
     pthread_mutex_unlock(&j->mutex);
+
+    // Iterar y liberar los recursos fuera de la zona crítica de la tabla
+    Allocation *all = allocs_to_release;
+    while (all != NULL) {
+        Allocation *sig = all->sig;
+        // Ahora release_resource (que invoca tabla_jobs_insert) puede tomar el lock de la tabla sin problemas
+        release_resource(all->name, all->amount);
+        free(all);
+        all = sig;
+    }
     return;
 }
 
@@ -436,6 +460,9 @@ static void tabla_jobs_remove(TablaJobs *j, int job_id) {
  */
 static void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     pthread_mutex_lock(&j->mutex);
+
+    Allocation *allocs_to_release_head = NULL;
+
     for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
         Job *prev = NULL;
         Job *curr = j->tabla_jobs[idx];
@@ -451,11 +478,11 @@ static void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
                 }
 
                 Allocation *all = curr->allocations;
-                while (all != NULL) {
-                    Allocation *sig = all->sig;
-                    release_resource(all->name, all->amount);
-                    free(all);
-                    all = sig;
+                if (all != NULL) {
+                    Allocation *tail = all;
+                    while(tail->sig != NULL) tail = tail->sig;
+                    tail->sig = allocs_to_release_head;
+                    allocs_to_release_head = all;
                 }
                 free(curr);
                 curr = next;
@@ -466,6 +493,14 @@ static void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
         }
     }
     pthread_mutex_unlock(&j->mutex);
+
+    Allocation *all = allocs_to_release_head;
+    while (all != NULL) {
+        Allocation *sig = all->sig;
+        release_resource(all->name, all->amount);
+        free(all);
+        all = sig;
+    }
     return;
 }
 
@@ -501,26 +536,52 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
 }
 
 // Atiende una orden RELEASE, liberando la memoria y la cola acorde
-static void release_resource (resource_t tipo, int amount) {
+static void release_resource(resource_t tipo, int amount) {
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
     manager.recursos[tipo].available_amount += amount;
 
     ColaPendingRequest *cola = &manager.recursos[tipo].cola;
-    while (!queue_is_empty(cola) &&
-            manager.recursos[tipo].available_amount >= cola->top->amount) {
+    
+    // Lista temporal para almacenar los trabajos que logran salir de la cola
+    PendingRequest *granted_list = NULL;
+    PendingRequest *granted_tail = NULL;
+
+    // Desencolamos los trabajos que ahora pueden satisfacerse
+    while (!queue_is_empty(cola) && manager.recursos[tipo].available_amount >= cola->top->amount) {
         PendingRequest* pending = queue_dequeue(cola);
         manager.recursos[tipo].available_amount -= pending->amount;
-        char buf[BUFF_SIZE];
-        if (pending->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
-            snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", pending->job_id);
+        
+        if (granted_list == NULL) {
+            granted_list = pending;
+            granted_tail = pending;
         } else {
-            snprintf(buf, sizeof(buf), "GRANTED %d\n", pending->job_id);
+            granted_tail->sig = pending;
+            granted_tail = pending;
         }
-        enqueue_write(g_epfd, pending->owner_conn, buf);
-        free(pending);
     }
-
+    // Liberamos el lock del recurso ANTES de interactuar con la tabla para evitar interbloqueos
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
+
+    // Ahora procesamos los trabajos aprobados de forma segura
+    PendingRequest *curr = granted_list;
+    while (curr != NULL) {
+        PendingRequest *next = curr->sig;
+        
+        // 1. LA SOLUCIÓN: Anotamos el trabajo en la tabla oficial para que no sea un fantasma
+        tabla_jobs_insert(&manager.tabla, curr->owner_conn, curr->job_id, tipo, curr->amount);
+        
+        // 2. Notificamos por red al dueño
+        char buf[BUFF_SIZE];
+        if (curr->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
+            snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", curr->job_id);
+        } else {
+            snprintf(buf, sizeof(buf), "GRANTED %d\n", curr->job_id);
+        }
+        enqueue_write(g_epfd, curr->owner_conn, buf);
+        
+        free(curr);
+        curr = next;
+    }
 }
 
 /**
@@ -884,6 +945,19 @@ void process_message(connection_t *conn, char *msg) {
         if (result.valido) {
             release_resource(result.type, result.amount);
             tabla_jobs_remove(&manager.tabla, result.job_id);
+
+            // PURGA DE FANTASMAS
+            pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
         }
         else {
             fprintf(stderr, "RELEASE mal formado %s\n", msg);
@@ -1054,12 +1128,23 @@ void process_message(connection_t *conn, char *msg) {
             pthread_mutex_unlock(&tabla_conns.mutex);
 
             tabla_jobs_remove(&manager.tabla, result.job_id);
-            
             eliminar_job_owner(result.job_id);
-            printf("llegue\n"); //
+
+            // PURGA DE FANTASMAS
+            pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
         }
         else {
-            fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
+            fprintf(stderr, "JOB_RELEASE mal formado: %s\n", msg);
         }
     }
     /**

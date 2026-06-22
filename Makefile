@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Iagente_c/include -pthread
+CFLAGS = -Wall -Iagente_c/include -pthread -g
 SRC = agente_c/src/resource_manager.c agente_c/src/protocol.c agente_c/src/server.c agente_c/src/main.c
 TARGET = agente
 

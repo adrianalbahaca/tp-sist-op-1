@@ -143,7 +143,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
 
     % Recibimos respuesta al JOB_REQUEST y actuamos al respecto
     io:format("ESTOY ESPERANDOOOOO...~n"),
-    case gen_tcp:recv(Socket, 0, 500) of
+    case gen_tcp:recv(Socket, 0, 5000) of
         {ok, Linea} ->
             io:format("Linea recibida: ~s~n", [Linea]),
             {TipoMensaje, IdCrudo} = 
@@ -191,7 +191,7 @@ start() ->
     rand:seed(exsp), % Similar a srand(time(NULL)) en C
 
     % Nos conectamos al agente C
-    case gen_tcp:connect(?HOST, ?PORT, [list, {packet, 0}, {active, false}]) of
+    case gen_tcp:connect(?HOST, ?PORT, [list, {packet, line}, {active, false}]) of
         {ok, Socket} ->
             io:format("Conectado al agente C en el puerto ~p~n", [?PORT]),
             register(master, self()),

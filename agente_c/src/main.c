@@ -51,11 +51,11 @@ int main(int argc, char *argv[]) {
     cfg.mem = atoi(argv[4]);
     cfg.gpu = atoi(argv[5]);
 
-    // Inicialización de Memoria y Gestor de Recursos
+    // 1. Inicialización de Memoria y Gestor de Recursos
     manager_init(cfg.cpu, cfg.mem, cfg.gpu);
     manager_set_ip(cfg.ip);
 
-    // Despliegue de Sockets e inicialización de epoll
+    // 2. Despliegue de Sockets e inicialización de epoll
     int epfd_global;
     if (init_server_sockets(cfg.ip, cfg.port, &epfd_global) < 0) {
         fprintf(stderr, "Fallo crítico en inicialización de capa de red.\n");
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     }
     manager_set_epoll(epfd_global);
 
-    // Emisión del primer datagrama UDP de descubrimiento
+    // 3. Emisión del primer datagrama UDP de descubrimiento
     char announce_msg[256];
     snprintf(announce_msg, sizeof(announce_msg), "ANNOUNCE %d cpu:%d mem:%d gpu:%d\n", 
              cfg.port, cfg.cpu, cfg.mem, cfg.gpu);
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
     // Retardo estructural para recibir topología preexistente antes de operar
     sleep(2);
 
-    // Despliegue del pool de hilos de atención I/O
+    // 4. Despliegue del pool de hilos de atención I/O
     pthread_t threads_pool[NUM_THREADS];
     for (int i = 0; i < NUM_THREADS; i++) {
         if (pthread_create(&threads_pool[i], NULL, worker_thread_loop, &epfd_global) != 0) {
@@ -82,14 +82,14 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Despliegue del hilo de broadcast UDP
+    // 5. Despliegue del hilo de broadcast UDP
     pthread_t thread_bc;
     if (pthread_create(&thread_bc, NULL, broadcast_loop, &cfg) != 0) {
         perror("Fallo en pthread_create (Broadcast)");
         exit(EXIT_FAILURE);
     }
 
-    // Bloqueo de ejecución del hilo principal
+    // 6. Bloqueo de ejecución del hilo principal
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads_pool[i], NULL);
     }
