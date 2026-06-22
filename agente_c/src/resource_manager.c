@@ -1036,9 +1036,7 @@ void process_message(connection_t *conn, char *msg) {
         }
     }
     else if (strncmp(msg, "JOB_STATUS", 10) == 0) {
-        /**
-         * TODO: Hacer función de parseo que verifique el parseo de este comando
-         */
+        
         job_status_msg_t result = parse_job_status(msg);
         if (result.valido) {
             char buf[BUFF_SIZE];
