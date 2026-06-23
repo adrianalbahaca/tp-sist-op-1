@@ -44,7 +44,7 @@ Erlang/OTP: Versión 24 o superior
 
 ### Compilacion 
 ```sh
-$ git clone https://github.com/adrianalbahaca/tp-sist-op-1/tree/SolucionAparente
+$ git clone https://github.com/adrianalbahaca/tp-sist-op-1/tree/main
 $ make all
 ```
 
