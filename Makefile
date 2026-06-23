@@ -6,7 +6,7 @@ TARGET = agente
 ERLC       = erlc
 ERLC_FLAGS = -W
 ERL_SRC    = planificador_erl/c_agent_client.erl
-ERL_BEAM   = $(ERL_SRC:.erl=.beam)   # cliente.beam protocolo.beam
+ERL_BEAM   = $(ERL_SRC:.erl=.beam)
 
 .PHONY: all clean run-c run-erl
 
@@ -22,11 +22,11 @@ $(TARGET): $(SRC)
 	$(ERLC) $(ERLC_FLAGS) $<
 
 # Ejecución de los programas compilados
-run-c: $(C_BIN)
-	./$(TARGET)
+run-c: $(TARGET)
+	./$(TARGET) 10.0.0.10 8100 4 8192 1
 
 run-erl: $(ERL_BEAM)
-	erl -noshell -s c_agent_client start
+	erl -pa planificador_erl -noshell -s c_agent_client start
 
 clean:
 	rm -f $(TARGET) $(ERL_BEAM)

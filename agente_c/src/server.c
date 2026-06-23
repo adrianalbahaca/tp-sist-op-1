@@ -75,8 +75,10 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     connection_t *conn = malloc(sizeof(connection_t));
     if (!conn) {
         perror("malloc");
+        close(fd);
         exit(EXIT_FAILURE);
     }
+
     conn->fd = fd;
     conn->type = type;
     conn->read_pos = 0;
@@ -85,6 +87,7 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     conn->write_len = 0;
 
     // Registramos el evento de lectura (EPOLLIN) asociando el puntero de la estructura
+    // EPOLLEXCLUSIVE es para que solo lo tome 1 del epoll_wait, como estamos en multihilo
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLEXCLUSIVE; 
     ev.data.ptr = conn;
@@ -100,7 +103,7 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     return conn;
 }
 
-/* Inicia una conexión TCP saliente hacia un nodo remoto de forma asíncrona*/
+/* Inicia una conexión TCP saliente hacia un nodo remoto de forma asíncrona */
 connection_t *connect_remote_node(int epfd, const char *ip, int port) {
     // Crea el socket
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -147,7 +150,8 @@ connection_t *connect_remote_node(int epfd, const char *ip, int port) {
 
     struct epoll_event ev;
     /**
-     * Se espera EPOLLOUT para confirmar que el handshake finalizó.
+     * Se espera EPOLLOUT para confirmar que el handshake finalizó. O sea, cuando
+     * se pueda escribir significa que funcionó
      * EPOLLONESHOT garantiza exclusión mutua en el event loop multihilo.
      */
     ev.events = EPOLLOUT | EPOLLONESHOT;
@@ -169,6 +173,7 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
     int socket_error = 0;
     socklen_t errlen = sizeof(socket_error);
 
+    // Obtiene el resultado final
     if (getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &socket_error, &errlen) < 0) {
         perror("getsockopt SO_ERROR");
         process_connection_failed(conn);
@@ -177,10 +182,11 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         free(conn);
         return;
     }
-
+    
     if (socket_error != 0) {
-        // La conexión asíncrona falló (ej. ECONNREFUSED)
+        // La conexión asíncrona falló (ej. ECONNREFUSED, ETIMEDOUT)
         fprintf(stderr, "Fallo al conectar nodo remoto: %s\n", strerror(socket_error));
+        // Aborta misión, descarta los paquetes
         process_connection_failed(conn);
         close(conn->fd);
         pthread_mutex_destroy(&conn->write_mutex);
@@ -193,12 +199,14 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
      * Se debe reconfigurar el evento en epoll para operar de forma regular
      * esperando lecturas (EPOLLIN) para recibir los GRANTED/DENIED.
      */
+    // Ahora la conexión existe
     conn->type = CONN_TCP_CLIENT_REMOTE; 
 
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLONESHOT;
     ev.data.ptr = conn;
 
+    // Actualiza el registro existente, diciendo que ahora escuche, solo le interesa cuando reciba algo
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod connection success");
         close(conn->fd);
@@ -207,6 +215,7 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         return;
     }
 
+    // Hace lo que pensabas hacer en un inicio con tu nueva conexión
     process_connection_ready(conn);
 }
 
@@ -240,7 +249,7 @@ static void handle_udp_read(connection_t *conn) {
         char sender_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &(sender_addr.sin_addr), sender_ip, INET_ADDRSTRLEN);
 
-        // Se delega el parseo del formato "ANNOUNCE <IP> <puerto> <recursos>"
+        // Se delega el parseo del formato "ANNOUNCE <puerto> <recursos>"
         process_announce(sender_ip, buffer);
     }
 
@@ -330,7 +339,7 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
     }
     conn->read_pos = remaining;
 
-    /* Reactivación final del descriptor en epoll */
+    /* Reactivación final del descriptor en epoll (porque era ONESHOT) */
     pthread_mutex_lock(&conn->write_mutex);
     struct epoll_event ev;
     if (conn->write_len > 0) {
@@ -418,6 +427,7 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
         ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
     }
 
+    // Reactivo el fd
     ev.data.ptr = conn;
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod write update");
@@ -607,8 +617,8 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
         return;
     }
 
-    // Copiar el nuevo mensaje al final del buffer existente
-    memcpy(conn->write_buf + conn->write_len, msg, msg_len);
+    // Copiar el nuevo mensaje al final real de la cola pendiente
+    memcpy(conn->write_buf + conn->write_pos + conn->write_len, msg, msg_len);
     conn->write_len += msg_len;
 
     /* Forzar la activación de EPOLLOUT en el kernel.

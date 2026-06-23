@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 
-#define MAX_EVENTS 64
+#define MAX_EVENTS 64 // Límite superior de eventos del epoll para 1 única iteración (max efds)
 #define BUFF_SIZE 1024
 
 #define UDP_DISCOVERY_PORT 12529
@@ -14,7 +14,7 @@
 
 /**
  * Identifica el rol de cada fd dentro del loop de epoll.
- * Para que event_loop sepa que handler ejecutar.
+ * Para que event_loop sepa qué handler ejecutar.
  */
 typedef enum {
     CONN_TCP_PUBLIC_LISTEN,  // Escucha a otros agentes en C
@@ -35,7 +35,6 @@ typedef struct {
     size_t read_pos;
     
     // Buffer para escrituras parciales
-    // mutex, a implementar
     pthread_mutex_t write_mutex;
     char write_buf[BUFF_SIZE];
     size_t write_pos;

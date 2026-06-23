@@ -549,7 +549,7 @@ static void release_resource(resource_t tipo, int amount) {
     // Desencolamos los trabajos que ahora pueden satisfacerse
     while (!queue_is_empty(cola) && manager.recursos[tipo].available_amount >= cola->top->amount) {
         PendingRequest* pending = queue_dequeue(cola);
-        manager.recursos[tipo].available_amount -= pending->amount;
+        // manager.recursos[tipo].available_amount -= pending->amount;
         
         if (granted_list == NULL) {
             granted_list = pending;
@@ -915,6 +915,9 @@ void manager_destroy() {
  * Debe decidir qué hacer con el mensaje, si RESERVE, RELEASE, etc.
  */
 void process_message(connection_t *conn, char *msg) {
+    // Identificación del origen para el log de mi consola
+    const char *origen = (conn->type == CONN_TCP_CLIENT_LOCAL) ? "ERLANG LOCAL" : "AGENTE REMOTO";
+    printf("\n[RX] De %s (fd %d) -> %s\n", origen, conn->fd, msg);
     // Se parsea la primera palabra usando caso por caso dependiendo del primer comando
     /**
      * RESERVE <job_id> <recurso> <amount>
@@ -928,12 +931,11 @@ void process_message(connection_t *conn, char *msg) {
                 tabla_jobs_insert(&manager.tabla, conn, result.job_id, result.type, result.amount);
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
-                printf("%s", buf); //
+                printf("[TX] A %s (fd %d) -> %s", origen, conn->fd, buf);
                 enqueue_write(g_epfd, conn, buf);
             }
-        }
-        else {
-            fprintf(stderr, "RESERVE mal formado %s\n", msg);
+        } else {
+            fprintf(stderr, "[!] RESERVE mal formado: %s\n", msg);
         }
     }
     /**
@@ -968,18 +970,16 @@ void process_message(connection_t *conn, char *msg) {
      */
     else if (strncmp(msg, "GRANTED", 7) == 0) {
         granted_msg_t result = parse_granted(msg);
-
         if (result.valido) {
-            fprintf(stderr, "GRANTED recibido del job %d\n", result.job_id);
             connection_t *owner = buscar_job_owner(result.job_id);
             if (owner != NULL) {
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+                printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
                 enqueue_write(g_epfd, owner, buf);
             }
-        }
-        else {
-            fprintf(stderr, "GRANTED mal formado: %s\n", msg);
+        } else {
+            fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
         }
     }
     /**
@@ -987,17 +987,15 @@ void process_message(connection_t *conn, char *msg) {
      */
     else if (strncmp(msg, "DENIED", 6) == 0) {
         denied_msg_t result = parse_denied(msg);
-
         if (result.valido) {
-            // fprintf(stderr, "DENIED recibido del job %d\n", result.job_id);
             connection_t *owner = buscar_job_owner(result.job_id);
             if (owner != NULL) {
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
+                printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
                 enqueue_write(g_epfd, owner, buf);
             }
-        }
-        else {
+        } else {
             fprintf(stderr, "DENIED mal formado: %s\n", msg);
         }
     }
@@ -1021,6 +1019,7 @@ void process_message(connection_t *conn, char *msg) {
                     tabla_jobs_insert(&manager.tabla, conn, result.job_id, list->type, list->amount);
                     char buf[BUFF_SIZE];
                     snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+                    printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
                     enqueue_write(g_epfd, conn, buf);
                 }
             }
@@ -1033,6 +1032,7 @@ void process_message(connection_t *conn, char *msg) {
                 if (remote != NULL) {
                     // Ya hay conexión activa con ese nodo, mandar directo
                     registrar_job_owner(result.job_id, conn);
+                    printf("[TX] A AGENTE REMOTO %s (fd %d) -> %s", list->ip, remote->fd, mensaje);
                     enqueue_write(g_epfd, remote, mensaje);
                 } else {
                     // No hay conexión activa: buscar el puerto y conectar
@@ -1055,6 +1055,7 @@ void process_message(connection_t *conn, char *msg) {
                             req->next = pendientes_salientes;
                             pendientes_salientes = req;
                             pthread_mutex_unlock(&mutex_pendientes_salientes);
+                            printf("[I] Iniciando conexión asíncrona hacia %s para enviar: %s", list->ip, mensaje);
                         }
                     }
                 }
@@ -1067,9 +1068,6 @@ void process_message(connection_t *conn, char *msg) {
      * GET_NODES
      */
     else if (strncmp(msg, "GET_NODES", 9) == 0) {
-        /**
-         * TODO: Hacer funciones que verifican el parseo para este elemento y conservar este proceso
-         */
         char buf[BUFF_SIZE];
         strcpy(buf, "NODES ");
         
@@ -1096,6 +1094,7 @@ void process_message(connection_t *conn, char *msg) {
         if (len > 6 && buf[len-1] == ';') buf[len-1] = '\n';
         else strcat(buf, "\n");
 
+        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
         enqueue_write(g_epfd, conn, buf);
     }
     /**
@@ -1121,6 +1120,7 @@ void process_message(connection_t *conn, char *msg) {
             for (int i = 0; i < TAM_TABLA_CONN; i++) {
                 ConnEntry *curr = tabla_conns.buckets[i];
                 while (curr != NULL) {
+                    printf("[TX] BROADCAST INTERNO A AGENTE %s (fd %d) -> %s", curr->ip, curr->conn->fd, buf);
                     enqueue_write(g_epfd, curr->conn, buf);
                     curr = curr->next;
                 }
@@ -1160,6 +1160,7 @@ void process_message(connection_t *conn, char *msg) {
             } else {
                 snprintf(buf, sizeof(buf), "JOB_STATUS %d UNKNOWN\n", result.job_id);
             }
+            printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
             enqueue_write(g_epfd, conn, buf);
         }
         else {
@@ -1216,11 +1217,16 @@ void process_disconnect(connection_t *conn) {
     JobOwner *curr_o = job_owners;
     while (curr_o != NULL) {
         if (curr_o->conn == conn) {
-            JobOwner *next_o = curr_o->next;
-            if (prev_o == NULL) job_owners = next_o;
-            else prev_o->next = next_o;
-            free(curr_o);
-            curr_o = next_o;
+            JobOwner *to_delete = curr_o;
+            
+            if (prev_o == NULL) {
+                job_owners = curr_o->next;
+                curr_o = job_owners; 
+            } else {
+                prev_o->next = curr_o->next;
+                curr_o = curr_o->next;
+            }
+            free(to_delete);
         } else {
             prev_o = curr_o;
             curr_o = curr_o->next;

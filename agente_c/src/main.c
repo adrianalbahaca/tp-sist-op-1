@@ -15,11 +15,9 @@ typedef struct {
     int gpu;
 } config_t;
 
-extern void tabla_nodos_purge(int timeout_secs);
-
 /**
  * Hilo Auxiliar: Emisión de estado UDP y purga de nodos caídos.
- * Ejecuta el ciclo de descubrimiento continuo según el protocolo 5.3.
+ * Ejecuta el ciclo de descubrimiento continuo según 5.3.
  */
 void *broadcast_loop(void *arg) {
     config_t *cfg = (config_t *)arg;
