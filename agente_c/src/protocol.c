@@ -223,16 +223,76 @@ job_status_msg_t parse_job_status(const char* msg) {
 }
 
 announce_msg_t parse_announce(const char* msg) {
+    
+    char temp[256];
+    strncpy(temp, msg, sizeof(temp) - 1);
+    temp[sizeof(temp) - 1] = '\0';
+
+    announce_msg_t result;
+    result.valido = false;
+
+    int puerto = 0, cpu = -1, mem = -1, gpu = -1;
+    char* saveptr;
+
+    char* token = strtok_r(temp, " ", &saveptr);
+    if (token == NULL || strcmp(token, "ANNOUNCE") != 0) {
+        fprintf(stderr, "ANNOUNCE mal formado: (token [%s])%s\n",token, msg);
+        return result;
+    }
+
+    token = strtok_r(NULL, " ", &saveptr);
+    if (token == NULL || sscanf(token, "%d", &puerto) != 1) {
+        fprintf(stderr, "ANNOUNCE mal formado (puerto inválido): %s\n", msg);
+        return result;
+    }
+    int i = 0;
+    while ((token = strtok_r(NULL, " ", &saveptr)) != NULL && i < 3) {
+        if (sscanf(token, "cpu:%d", &cpu) == 1) {
+            i++;
+            continue;
+        }
+        if (sscanf(token, "mem:%d", &mem) == 1){
+            i++;
+            continue;
+        }
+        if (sscanf(token, "gpu:%d", &gpu) == 1){
+            i++;
+            continue;
+        }
+        //if (strcmp())
+        
+        fprintf(stderr, "cpu%d gpu%d mem%d - [%s] - ", cpu, gpu, mem, token);
+        fprintf(stderr, "ANNOUNCE mal formado (componente): [%s]\n", msg);
+        return result;
+    }
+
+    if (cpu == -1 || mem == -1 || gpu == -1) {
+        fprintf(stderr, "%d %d %d", cpu, gpu, mem);
+        fprintf(stderr, "ANNOUNCE mal formado - faltan: %s\n", msg);
+        return result;
+    }
+    
+    /*
     announce_msg_t result;
     result.valido = false;
 
     // Parsear el mensaje
     int puerto, cpu, mem, gpu;
+
     int n = sscanf(msg, "ANNOUNCE %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
     if (n != 4) {
+        if (4 == sscanf(msg, "ANNOUNCE %d cpu:%d gpu:%d mem:%d", &puerto, &cpu, &gpu, &mem)) {
+            result.cpu = cpu;
+            result.mem = mem;
+            result.gpu = gpu;
+            result.puerto = puerto;
+            result.valido = true;
+
+            return result;
+        }
         fprintf(stderr, "ANNOUNCE mal formado: %s\n", msg);
         return result;
-    }
+    }*/
 
     result.cpu = cpu;
     result.mem = mem;

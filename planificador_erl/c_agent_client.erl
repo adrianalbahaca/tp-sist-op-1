@@ -53,11 +53,13 @@ rand_desde_cero(N) ->
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock)
 armar_comando(Maps_list) ->
-    ListaOrdenada = lists:sort(
-        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
-        Maps_list
-    ),
-    armar_comando_ordenado(ListaOrdenada).
+    %ListaOrdenada = lists:sort(
+    %    fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
+    %    Maps_list
+    %),
+    %armar_comando_ordenado(ListaOrdenada).
+    armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
+
 
 % Arma el comando una vez ordenada la lista de nodos
 armar_comando_ordenado(Maps_list) ->

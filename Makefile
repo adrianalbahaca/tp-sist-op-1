@@ -9,7 +9,7 @@ ERL_SRC    = planificador_erl/c_agent_client.erl
 ERL_BEAM   = $(ERL_SRC:.erl=.beam)
 
 # Parámetros por defecto para la ejecución dinámica del agente C
-IP ?= 127.0.0.1
+IP ?= 192.168.146.50
 PORT ?= 8000
 CPU ?= 2
 MEM ?= 4096
