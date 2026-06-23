@@ -108,7 +108,7 @@ job_handler(Job_id, _GrantsEsperados) ->
                 denied ->
                     io:format("Job ~p DENEGADO. Abortando transacción.~n", [Job_id]),
                     master ! {release, Job_id}
-            after 50000 ->
+            after 5000 ->
                 % Paso algo raro, demasiado tiempo esperando
                 io:format("Job ~p (Timeout). Abortando.~n", [Job_id]),
                 master ! {release, Job_id}
