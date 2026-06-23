@@ -17,8 +17,8 @@ typedef enum {
     RM_QUEUED,
     RM_DENIED
 } result_t;
-
 static void release_resource(resource_t tipo, int amount);
+static void avanzar_reserva(int job_id);
 
 // La tabla de jobs será una tabla hash con función de hasheo simple
 typedef struct Allocation {
@@ -108,21 +108,40 @@ static pthread_mutex_t mutex_pendientes_salientes = PTHREAD_MUTEX_INITIALIZER;
 typedef struct JobOwner {
     int job_id;
     connection_t *conn;
+    resource_request_t *pending_requests;
     struct JobOwner *next;
 } JobOwner;
 
 static JobOwner *job_owners = NULL;
 static pthread_mutex_t mutex_job_owners = PTHREAD_MUTEX_INITIALIZER;
 
-static void registrar_job_owner(int job_id, connection_t *conn) {
+// Ahora almacena la lista enlazada de peticiones pendientes
+static void registrar_job_owner(int job_id, connection_t *conn, resource_request_t *reqs) {
     pthread_mutex_lock(&mutex_job_owners);
     JobOwner *o = malloc(sizeof(JobOwner));
     o->job_id = job_id;
     o->conn = conn;
+    o->pending_requests = reqs;
     o->next = job_owners;
     job_owners = o;
     pthread_mutex_unlock(&mutex_job_owners);
 }
+/*
+static bool decrementar_job_grants(int job_id) {
+    pthread_mutex_lock(&mutex_job_owners);
+    bool completo = false;
+    JobOwner *curr = job_owners;
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            curr->pending_grants--;
+            if (curr->pending_grants == 0) completo = true;
+            break;
+        }
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&mutex_job_owners);
+    return completo;
+}*/
 
 static connection_t* buscar_job_owner(int job_id) {
     pthread_mutex_lock(&mutex_job_owners);
@@ -146,19 +165,21 @@ static void eliminar_job_owner(int job_id) {
 
     while (curr != NULL) {
         if (curr->job_id == job_id) {
-            JobOwner *to_delete = curr;
-            if (prev == NULL) {
-                job_owners = curr->next;
-                curr = job_owners;
-            } else {
-                prev->next = curr->next;
-                curr = prev->next;
+            if (prev == NULL) job_owners = curr->next;
+            else prev->next = curr->next;
+            
+            // Purga de la lista de peticiones en caso de aborto prematuro (DENIED)
+            resource_request_t *req = curr->pending_requests;
+            while(req != NULL) {
+                resource_request_t *next = req->next;
+                free(req);
+                req = next;
             }
-            free(to_delete);
-        } else {
-            prev = curr;
-            curr = curr->next;
+            free(curr);
+            break;
         }
+        prev = curr;
+        curr = curr->next;
     }
     pthread_mutex_unlock(&mutex_job_owners);
 }
@@ -549,7 +570,7 @@ static void release_resource(resource_t tipo, int amount) {
     // Desencolamos los trabajos que ahora pueden satisfacerse
     while (!queue_is_empty(cola) && manager.recursos[tipo].available_amount >= cola->top->amount) {
         PendingRequest* pending = queue_dequeue(cola);
-        // manager.recursos[tipo].available_amount -= pending->amount;
+        manager.recursos[tipo].available_amount -= pending->amount;
         
         if (granted_list == NULL) {
             granted_list = pending;
@@ -567,17 +588,39 @@ static void release_resource(resource_t tipo, int amount) {
     while (curr != NULL) {
         PendingRequest *next = curr->sig;
         
-        // 1. LA SOLUCIÓN: Anotamos el trabajo en la tabla oficial para que no sea un fantasma
+        // Anotamos el trabajo en la tabla oficial para que no sea un fantasma
         tabla_jobs_insert(&manager.tabla, curr->owner_conn, curr->job_id, tipo, curr->amount);
         
-        // 2. Notificamos por red al dueño
-        char buf[BUFF_SIZE];
         if (curr->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
-            snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", curr->job_id);
+            // El Job local avanzó en la cola local. Reanudar secuencia jerárquica.
+            avanzar_reserva(curr->job_id);
         } else {
+            char buf[BUFF_SIZE];
             snprintf(buf, sizeof(buf), "GRANTED %d\n", curr->job_id);
+            printf("[TX] A AGENTE REMOTO (fd %d) -> %s", curr->owner_conn->fd, buf);
+            enqueue_write(g_epfd, curr->owner_conn, buf);
         }
-        enqueue_write(g_epfd, curr->owner_conn, buf);
+        /*
+        // 2. Notificamos por red al dueño
+        // char buf[BUFF_SIZE];
+        if (curr->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
+            bool completo = decrementar_job_grants(curr->job_id);
+            if (completo) {
+                connection_t *owner = buscar_job_owner(curr->job_id);
+                if (owner != NULL) {
+                    char buf[BUFF_SIZE];
+                    snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", curr->job_id);
+                    printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
+                    enqueue_write(g_epfd, owner, buf);
+                }
+                eliminar_job_owner(curr->job_id);
+            }
+        } else {
+            char buf[BUFF_SIZE];
+            snprintf(buf, sizeof(buf), "GRANTED %d\n", curr->job_id);
+            printf("[TX] A AGENTE REMOTO (fd %d) -> %s", curr->owner_conn->fd, buf);
+            enqueue_write(g_epfd, curr->owner_conn, buf);
+        }*/
         
         free(curr);
         curr = next;
@@ -863,6 +906,89 @@ void manager_init(int cpu, int mem, int gpu) {
     return;
 }
 
+void avanzar_reserva(int job_id) {
+    pthread_mutex_lock(&mutex_job_owners);
+    JobOwner *curr = job_owners;
+    while (curr != NULL) {
+        if (curr->job_id == job_id) break;
+        curr = curr->next;
+    }
+    
+    if (curr == NULL) {
+        pthread_mutex_unlock(&mutex_job_owners);
+        return;
+    }
+
+    if (curr->pending_requests == NULL) {
+        // Fin de la secuencia. Transacción distribuida exitosa.
+        connection_t *conn_erlang = curr->conn;
+        pthread_mutex_unlock(&mutex_job_owners);
+        
+        char buf[BUFF_SIZE];
+        snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", job_id);
+        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn_erlang->fd, buf);
+        enqueue_write(g_epfd, conn_erlang, buf);
+        eliminar_job_owner(job_id);
+        return;
+    }
+
+    // Extraer atómicamente el próximo recurso de la secuencia
+    resource_request_t *req = curr->pending_requests;
+    curr->pending_requests = req->next;
+    connection_t *conn_erlang = curr->conn;
+    pthread_mutex_unlock(&mutex_job_owners);
+
+    if (strcmp(req->ip, g_ip) == 0) {
+        // Recurso local
+        result_t r = reserve_resource(req->type, req->amount, job_id, conn_erlang);
+        if (r == RM_GRANTED) {
+            tabla_jobs_insert(&manager.tabla, conn_erlang, job_id, req->type, req->amount);
+            free(req);
+            avanzar_reserva(job_id); // Continúa la cadena instantáneamente
+        } else {
+            // RM_QUEUED: Detiene la ejecución. release_resource reanudará la cadena.
+            free(req);
+        }
+    } else {
+        // Recurso remoto
+        char mensaje[BUFF_SIZE];
+        snprintf(mensaje, sizeof(mensaje), "RESERVE %d %s %d\n", job_id, resource_type_to_str(req->type), req->amount);
+
+        connection_t *remote = tabla_conns_lookup(req->ip);
+        if (remote != NULL) {
+            printf("[TX] A AGENTE REMOTO %s (fd %d) -> %s", req->ip, remote->fd, mensaje);
+            enqueue_write(g_epfd, remote, mensaje);
+        } else {
+            int puerto = tabla_nodos_get_puerto(req->ip);
+            connection_t *nueva = NULL;
+            if (puerto != -1) nueva = connect_remote_node(g_epfd, req->ip, puerto);
+
+            if (nueva == NULL) {
+                fprintf(stderr, "Fallo crítico de enrutamiento hacia %s. Abortando Job %d.\n", req->ip, job_id);
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", job_id);
+                enqueue_write(g_epfd, conn_erlang, buf);
+                eliminar_job_owner(job_id);
+            } else {
+                OutReq *out = malloc(sizeof(OutReq));
+                out->conn = nueva;
+                strncpy(out->msg, mensaje, sizeof(out->msg) - 1);
+                out->msg[sizeof(out->msg) - 1] = '\0';
+                strncpy(out->ip, req->ip, sizeof(out->ip) - 1);
+                out->ip[sizeof(out->ip) - 1] = '\0';
+
+                pthread_mutex_lock(&mutex_pendientes_salientes);
+                out->next = pendientes_salientes;
+                pendientes_salientes = out;
+                pthread_mutex_unlock(&mutex_pendientes_salientes);
+                printf("[I] Iniciando conexión asíncrona hacia %s para enviar: %s", req->ip, mensaje);
+            }
+        }
+        free(req);
+    }
+}
+
+
 // Destruye el gestor de recursos del agente en C local, liberando la memoria
 void manager_destroy() {
     pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -917,7 +1043,7 @@ void manager_destroy() {
 void process_message(connection_t *conn, char *msg) {
     // Identificación del origen para el log de mi consola
     const char *origen = (conn->type == CONN_TCP_CLIENT_LOCAL) ? "ERLANG LOCAL" : "AGENTE REMOTO";
-    printf("\n[RX] De %s (fd %d) -> %s\n", origen, conn->fd, msg);
+    printf("[RX] De %s (fd %d) -> %s\n", origen, conn->fd, msg);
     // Se parsea la primera palabra usando caso por caso dependiendo del primer comando
     /**
      * RESERVE <job_id> <recurso> <amount>
@@ -971,13 +1097,7 @@ void process_message(connection_t *conn, char *msg) {
     else if (strncmp(msg, "GRANTED", 7) == 0) {
         granted_msg_t result = parse_granted(msg);
         if (result.valido) {
-            connection_t *owner = buscar_job_owner(result.job_id);
-            if (owner != NULL) {
-                char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
-                printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
-                enqueue_write(g_epfd, owner, buf);
-            }
+            avanzar_reserva(result.job_id);
         } else {
             fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
         }
@@ -995,6 +1115,7 @@ void process_message(connection_t *conn, char *msg) {
                 printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
                 enqueue_write(g_epfd, owner, buf);
             }
+            eliminar_job_owner(result.job_id);
         } else {
             fprintf(stderr, "DENIED mal formado: %s\n", msg);
         }
@@ -1010,17 +1131,37 @@ void process_message(connection_t *conn, char *msg) {
             return;
         }
 
+        registrar_job_owner(result.job_id, conn, result.request_list);
+        avanzar_reserva(result.job_id);
+        /*
+        int count = 0;
+        resource_request_t *tmp = result.request_list;
+        while(tmp != NULL) {count ++; tmp = tmp->next;}
+        
+        registrar_job_owner(result.job_id, conn, count);
+        avanzar_reserva(result.job_id);
+        
         resource_request_t *list = result.request_list;
-
         while (list != NULL) {
             if (strcmp(list->ip, g_ip) == 0) {
                 result_t r = reserve_resource(list->type, list->amount, result.job_id, conn);
                 if (r == RM_GRANTED) {
                     tabla_jobs_insert(&manager.tabla, conn, result.job_id, list->type, list->amount);
-                    char buf[BUFF_SIZE];
-                    snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
-                    printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
-                    enqueue_write(g_epfd, conn, buf);
+                //    char buf[BUFF_SIZE];
+                //    snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+                //    printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
+                //    enqueue_write(g_epfd, conn, buf);
+                    bool completo = decrementar_job_grants(result.job_id);
+            
+                    // Si por casualidad era el último recurso que faltaba (ej. solo pediste local), 
+                    // notificamos a Erlang ya mismo.
+                    if (completo) {
+                        char buf[BUFF_SIZE];
+                        snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+                        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
+                        enqueue_write(g_epfd, conn, buf);
+                        eliminar_job_owner(result.job_id);
+                    }   
                 }
             }
             else {
@@ -1031,38 +1172,44 @@ void process_message(connection_t *conn, char *msg) {
                 connection_t *remote = tabla_conns_lookup(list->ip);
                 if (remote != NULL) {
                     // Ya hay conexión activa con ese nodo, mandar directo
-                    registrar_job_owner(result.job_id, conn);
+                    // registrar_job_owner(result.job_id, conn, count);
                     printf("[TX] A AGENTE REMOTO %s (fd %d) -> %s", list->ip, remote->fd, mensaje);
                     enqueue_write(g_epfd, remote, mensaje);
                 } else {
                     // No hay conexión activa: buscar el puerto y conectar
                     int puerto = tabla_nodos_get_puerto(list->ip);
-                    if (puerto == -1) {
-                        fprintf(stderr, "JOB_REQUEST: nodo %s desconocido, no se puede contactar\n", list->ip);
+                    connection_t *nueva = connect_remote_node(g_epfd, list->ip, puerto);
+                    if (puerto == -1 || (nueva = connect_remote_node(g_epfd, list->ip, puerto)) == NULL) {
+                        fprintf(stderr, "Fallo crítico de enrutamiento hacia %s. Abortando Job %d.\n", list->ip, result.job_id);
+                        char buf[BUFF_SIZE];
+                        snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
+                        enqueue_write(g_epfd, conn, buf);
+                        eliminar_job_owner(result.job_id);
+                        // Para evitar continuar iterando sobre un Job ya destruido:
+                        resource_list_destroy(result.request_list);
+                        return;
                     } else {
-                        connection_t *nueva = connect_remote_node(g_epfd, list->ip, puerto);
-                        if (nueva != NULL) {
-                            registrar_job_owner(result.job_id, conn);
-                            // Encolar el mensaje pendiente hasta que la conexión esté lista
-                            OutReq *req = malloc(sizeof(OutReq));
-                            req->conn = nueva;
-                            strncpy(req->msg, mensaje, sizeof(req->msg) - 1);
-                            req->msg[sizeof(req->msg) - 1] = '\0';
-                            strncpy(req->ip, list->ip, sizeof(req->ip) - 1);
-                            req->ip[sizeof(req->ip) - 1] = '\0';
+                        // registrar_job_owner(result.job_id, conn, count);
+                        // Encolar el mensaje pendiente hasta que la conexión esté lista
+                        OutReq *req = malloc(sizeof(OutReq));
+                        req->conn = nueva;
+                        strncpy(req->msg, mensaje, sizeof(req->msg) - 1);
+                        req->msg[sizeof(req->msg) - 1] = '\0';
+                        strncpy(req->ip, list->ip, sizeof(req->ip) - 1);
+                        req->ip[sizeof(req->ip) - 1] = '\0';
 
-                            pthread_mutex_lock(&mutex_pendientes_salientes);
-                            req->next = pendientes_salientes;
-                            pendientes_salientes = req;
-                            pthread_mutex_unlock(&mutex_pendientes_salientes);
-                            printf("[I] Iniciando conexión asíncrona hacia %s para enviar: %s", list->ip, mensaje);
-                        }
+                        pthread_mutex_lock(&mutex_pendientes_salientes);
+                        req->next = pendientes_salientes;
+                        pendientes_salientes = req;
+                        pthread_mutex_unlock(&mutex_pendientes_salientes);
+                        printf("[I] Iniciando conexión asíncrona hacia %s para enviar: %s", list->ip, mensaje);
                     }
                 }
             }
             list = list->next;
         }
         resource_list_destroy(result.request_list);
+        */
     }
     /**
      * GET_NODES
@@ -1321,6 +1468,7 @@ void process_connection_failed(connection_t *conn) {
                     snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", job_id);
                     enqueue_write(g_epfd, owner, buf);
                 }
+                eliminar_job_owner(job_id);
             }
             
             free(curr);

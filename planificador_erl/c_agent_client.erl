@@ -6,7 +6,9 @@
 -define(HOST, "localhost").
 -define(GET_NODES, "GET_NODES\n").
 
--define(RAFAGA, 4).
+% -define(RAFAGA, 4).
+
+-define(RAFAGA, 2).
 
 % Arma la lista de pares que luego se utilizará para armar el mapa
 armar_lista(Node_listed) -> 
@@ -45,11 +47,11 @@ get_list_maps(N) ->
     end.
 
 % Similar a rand:uniform, pero desde 0 a N
+% Limita la petición máxima a un tercio de la capacidad del nodo
+rand_desde_cero(0) -> 0;
 rand_desde_cero(N) -> 
-    case N of
-        0 -> 0;
-        N -> rand:uniform(N + 1) - 1
-    end.
+    Max = max(1, N div 3), 
+    rand:uniform(Max + 1) - 1.
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock)
 armar_comando(Maps_list) ->
@@ -88,19 +90,30 @@ sleep(Ms) ->
     end.
 
 % Vigila el estado del job recibido como argumento
-job_handler(Job_id, _Socket) ->
-    receive
-        granted ->
-            io:format("Job ~p trabajando...~n", [Job_id]),
-            sleep(5000),
-            master ! {release, Job_id},
-            %gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n"),
-            io:format("Job ~p envió RELEASE~n", [Job_id]);
-        denied ->
-            io:format("Job ~p denegado~n", [Job_id]);
-        timeout ->
-            io:format("Job ~p expiró por timeout~n", [Job_id])
-    end.
+job_handler(Job_id, _GrantsEsperados) ->
+    % if
+    %     GrantsEsperados == 0 ->
+    %         io:format("Job ~p trabajando...~n", [Job_id]),
+    %         sleep(5000),
+    %         io:format("Job ~p finalizó. Solicitando RELEASE general.~n", [Job_id]),
+    %         master ! {release, Job_id};
+    %     true ->
+            receive
+                granted ->
+                    io:format("Job ~p trabajando...~n", [Job_id]),
+                    sleep(1000 + rand:uniform(4000)),
+                    io:format("Job ~p finalizó. Solicitando RELEASE general.~n", [Job_id]),
+                    master ! {release, Job_id};
+                    %job_handler(Job_id, GrantsEsperados - 1);
+                denied ->
+                    io:format("Job ~p DENEGADO. Abortando transacción.~n", [Job_id]),
+                    master ! {release, Job_id}
+            after 50000 ->
+                % Paso algo raro, demasiado tiempo esperando
+                io:format("Job ~p (Timeout). Abortando.~n", [Job_id]),
+                master ! {release, Job_id}
+            end.
+    % end.
 
 % Dispara los 4 requests seguidos al socket en paralelo
 % También arma el map con los jobs solicitados sin respuesta del agente C
@@ -117,7 +130,12 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
                 _ ->
                     Job_id = erlang:unique_integer([positive]), 
                     gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando ++ "\n"),
-                    Pid = spawn(?MODULE, job_handler, [Job_id, Socket]),
+
+                    % Se calcula la cantidad de nodos (IPs) involucrados contando el delimitador '@'
+                    % Tokens = string:split(string:trim(Comando), "@", all),
+                    % GrantsEsperados = length(Tokens) - 1,
+
+                    Pid = spawn(?MODULE, job_handler, [Job_id, 1]),
                     NewMap = maps:put(Job_id, Pid, HandlersMap),
                     disparar_rafaga(Maps_list, Socket, Cantidad - 1, NewMap)
             end
@@ -136,7 +154,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
     MapConJobs = 
         case maps:size(HandlersMap) of
             0 -> 
-                sleep(2000), % Pausa de cortesía para no saturar al Agente
+                sleep(1000 + rand:uniform(2000)), % Pausa de cortesía para no saturar al Agente
                 disparar_rafaga(Maps_list, Socket, ?RAFAGA, HandlersMap);
             _ -> 
                 HandlersMap
@@ -181,14 +199,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
                                     timeout -> registrar_log(JobIdRecibido, "EXPIRADO", "Tiempo de espera agotado.")
                                 end,
 
-                                % Si el Job fue rechazado o expiró, lo sacamos del mapa acá mismo
-                                % (Si fue GRANTED, no lo sacamos porque esperamos que el handler mande {release})
-                                CleanMapNetwork = 
-                                    case TipoMensaje of
-                                        granted -> MapConJobs;
-                                        _       -> maps:remove(JobIdRecibido, MapConJobs)
-                                    end,
-                                masterloop(Maps_list, Socket, CleanMapNetwork);
+                                masterloop(Maps_list, Socket, MapConJobs);
                             error ->
                                 masterloop(Maps_list, Socket, MapConJobs)
                         end
@@ -203,7 +214,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
     end.
 % Función para iniciar el cliente de Erlang
 start() ->
-    rand:seed(exsp), % Similar a srand(time(NULL)) en C
+    rand:seed(exsplus), % Similar a srand(time(NULL)) en C
 
     % Nos conectamos al agente C
     case gen_tcp:connect(?HOST, ?PORT, [list, {packet, line}, {active, false}]) of

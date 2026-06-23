@@ -15,17 +15,17 @@ static void resource_list_insert(resource_request_t **list, char ip[16], resourc
     resource->type = type;
     strncpy(resource->ip, ip, sizeof(resource->ip)-1);
     resource->ip[sizeof(resource->ip) - 1] = '\0';
+    resource->next = NULL;
 
-    if (list == NULL) {
-        resource->next = NULL;
+    if (*list == NULL) {
+        *list = resource;
+    } else {
+        resource_request_t *curr = *list;
+        while (curr->next != NULL) {
+            curr = curr->next;
+        }
+        curr->next = resource;
     }
-    else {
-        resource->next = *list;
-    }
-
-    *list = resource;
-
-    return;
 }
 
 void resource_list_destroy(resource_request_t *list) {
@@ -144,6 +144,7 @@ job_request_t parse_job_request(const char* buf) {
     result.valido = false;
 
     char* msg = strdup(buf);
+    
     // Obtener job_id
     int job_id;
     if (sscanf(msg, "JOB_REQUEST %d", &job_id) != 1) {
@@ -151,51 +152,42 @@ job_request_t parse_job_request(const char* buf) {
         return result;
     }
     result.job_id = job_id;
-    
-    // Empezar compilación de elementos
-    result.request_list = NULL; // La lista inicia vacía
+    result.request_list = NULL;
 
-    // Descartar los primeros 2 comandos
+    // Descartar los primeros 2 tokens ("JOB_REQUEST" y "<job_id>")
     char* saveptr;
     char* token = strtok_r(msg, " ", &saveptr);
     token = strtok_r(NULL, " ", &saveptr);
 
-    // Luego, iterar sobre cada uno
-    char ip[16], recurso[16];
-    int amount;
-    resource_t type;
+    char ip[16];
+    int c_amt, m_amt, g_amt;
 
+    // Iterar sobre cada bloque contiguo separado por espacios
     while ((token = strtok_r(NULL, " ", &saveptr)) != NULL) {
-        if (sscanf(token, "@%15[^:]:%15[^:]:%d", ip, recurso, &amount) != 3) {
+        // Máscara exacta para el formato: @10.0.0.10:cpu:2:mem:10:gpu:1
+        if (sscanf(token, "@%15[^:]:cpu:%d:mem:%d:gpu:%d", ip, &c_amt, &m_amt, &g_amt) == 4) {
+            
+            // Inserción condicional para evitar reservar 0 unidades
+            if (c_amt > 0) {
+                resource_list_insert(&result.request_list, ip, RESOURCE_CPU, c_amt);
+            }
+            if (m_amt > 0) {
+                resource_list_insert(&result.request_list, ip, RESOURCE_MEM, m_amt);
+            }
+            if (g_amt > 0) {
+                resource_list_insert(&result.request_list, ip, RESOURCE_GPU, g_amt);
+            }
+            
+        } else {
             resource_list_destroy(result.request_list);
             free(msg);
-            return result;
-        }
-        else {
-            if (strcmp(recurso, "cpu") == 0) {
-                type = RESOURCE_CPU;
-            }
-            else if (strcmp(recurso, "mem") == 0) {
-                type = RESOURCE_MEM;
-            }
-            else if (strcmp(recurso, "gpu") == 0) {
-                type = RESOURCE_GPU;
-            }
-            else {
-                resource_list_destroy(result.request_list);
-                free(msg);
-                return result;
-            }
-
-            resource_list_insert(&result.request_list, ip, type, amount);
+            return result; // Fallo de parseo léxico
         }
     }
 
-    // Si salió sin problemas, se debe de retornar el resultado adecuadamente
     result.valido = true;
     free(msg);
     return result;
-
 }
 
 job_release_msg_t parse_job_release(const char* msg) {
