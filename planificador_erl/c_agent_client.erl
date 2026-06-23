@@ -6,11 +6,9 @@
 -define(HOST, "localhost").
 -define(GET_NODES, "GET_NODES\n").
 
-% -define(RAFAGA, 4).
-
 -define(RAFAGA, 2).
 
-% Arma la lista de pares que luego se utilizará para armar el mapa
+% Arma la lista de pares que luego se utilizará para armar el mapa del nodo correspondiente
 armar_lista(Node_listed) -> 
     case Node_listed of
         [] -> [];
@@ -36,7 +34,7 @@ map_gen(Nodes) ->
             map_gen(Tail)
     end.
 
-% Recolector síncrono estricto por conteo de nodos
+% Recolecta los mapas de nodos y los junta en una lista
 get_list_maps(N) ->
     case N of
         0 -> [];
@@ -91,32 +89,23 @@ sleep(Ms) ->
 
 % Vigila el estado del job recibido como argumento
 job_handler(Job_id, _GrantsEsperados) ->
-    % if
-    %     GrantsEsperados == 0 ->
-    %         io:format("Job ~p trabajando...~n", [Job_id]),
-    %         sleep(5000),
-    %         io:format("Job ~p finalizó. Solicitando RELEASE general.~n", [Job_id]),
-    %         master ! {release, Job_id};
-    %     true ->
-            receive
-                granted ->
-                    io:format("Job ~p trabajando...~n", [Job_id]),
-                    sleep(1000 + rand:uniform(4000)),
-                    io:format("Job ~p finalizó. Solicitando RELEASE general.~n", [Job_id]),
-                    master ! {release, Job_id};
-                    %job_handler(Job_id, GrantsEsperados - 1);
-                denied ->
-                    io:format("Job ~p DENEGADO. Abortando transacción.~n", [Job_id]),
-                    master ! {release, Job_id}
+        receive
+            granted ->
+                io:format("Job ~p trabajando...~n", [Job_id]),
+                sleep(1000 + rand:uniform(4000)),
+                io:format("Job ~p finalizó. Solicitando RELEASE general.~n", [Job_id]),
+                master ! {release, Job_id};
+            denied ->
+                io:format("Job ~p DENEGADO. Abortando transacción.~n", [Job_id]),
+                master ! {release, Job_id}
             after 5000 ->
                 % Paso algo raro, demasiado tiempo esperando
                 io:format("Job ~p (Timeout). Abortando.~n", [Job_id]),
                 master ! {release, Job_id}
-            end.
-    % end.
+        end.
 
 % Dispara los 4 requests seguidos al socket en paralelo
-% También arma el map con los jobs solicitados sin respuesta del agente C
+% También arma el map con los jobs pendientes
 disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
     case Cantidad of
 
@@ -154,7 +143,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
     MapConJobs = 
         case maps:size(HandlersMap) of
             0 -> 
-                sleep(1000 + rand:uniform(2000)), % Pausa de cortesía para no saturar al Agente
+                sleep(1000 + rand:uniform(2000)), % Pausa para no saturar al Agente
                 disparar_rafaga(Maps_list, Socket, ?RAFAGA, HandlersMap);
             _ -> 
                 HandlersMap
@@ -172,7 +161,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
         io:format("ESPERANDO~n"),
         case gen_tcp:recv(Socket, 0, 5000) of
             {ok, LineaConSalto} ->
-                % Removemos el \n del protocolo antes de procesar nada
+                % Removemos el \n de la línea
                 Linea = string:trim(LineaConSalto, trailing, "\n"),
                 
                 {TipoMensaje, IdCrudo} = 
