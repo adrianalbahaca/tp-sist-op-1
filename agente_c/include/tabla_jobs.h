@@ -44,14 +44,4 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 
 void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount);
 
-void tabla_jobs_remove(TablaJobs *j, int job_id);
-
-/**
- * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos
- * (vía release_resource, que SÍ toma su propio lock) y elimina los jobs.
- * NO se llama con j->mutex tomado, porque release_resource necesita tomar
- * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
- */
-void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
-
 #endif

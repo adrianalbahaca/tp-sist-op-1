@@ -1,6 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Iagente_c/include -pthread -g
-SRC = agente_c/src/resource_manager.c agente_c/src/protocol.c agente_c/src/server.c agente_c/src/main.c agente_c/src/pending_request.c
+SRC = agente_c/src/resource_manager.c agente_c/src/protocol.c agente_c/src/server.c \
+	agente_c/src/main.c agente_c/src/pending_request.c agente_c/src/tabla_jobs.c
 TARGET = agente
 PLANIF = planificador.log
 
