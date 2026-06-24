@@ -9,7 +9,7 @@ PLANIF = planificador.log
 ERLC       = erlc
 ERLC_FLAGS = -W
 ERL_SRC    = planificador_erl/c_agent_client.erl
-ERL_FILE   = planificador_erl/c_agent_client.erl
+ERL_FILE   = c_agent_client.beam
 ERL_BEAM   = $(ERL_SRC:.erl=.beam)
 
 # Parámetros por defecto para la ejecución dinámica del agente C
@@ -41,7 +41,7 @@ run-erl: $(ERL_BEAM)
 	erl -pa planificador_erl -noshell -s c_agent_client start
 
 clean:
-	rm -f $(TARGET) $(ERL_BEAM) $(PLANIF)
+	rm -f $(TARGET) $(ERL_FILE) $(PLANIF)
 
 
 # Comandos a ejecutar en cada terminal para correr el programa en una pc

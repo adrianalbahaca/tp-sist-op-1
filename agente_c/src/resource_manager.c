@@ -744,6 +744,11 @@ void process_message(connection_t *conn, char *msg) {
 
         registrar_job_owner(result.job_id, conn, result.request_list);
         avanzar_reserva(result.job_id);
+
+        /**
+         * Lo comentado acá es un código hecho anteriormente para lidiar con ciertos registros
+         * Se mantiene como referencia
+         */
         /*
         int count = 0;
         resource_request_t *tmp = result.request_list;
