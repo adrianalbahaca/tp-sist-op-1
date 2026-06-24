@@ -44,8 +44,7 @@ get_list_maps(N) ->
             end
     end.
 
-% Similar a rand:uniform, pero desde 0 a N
-% Limita la petición máxima a un tercio de la capacidad del nodo
+% Similar a rand:uniform, pero desde 0 a N/3
 rand_desde_cero(0) -> 0;
 rand_desde_cero(N) -> 
     Max = max(1, N div 3), 
@@ -73,8 +72,22 @@ armar_comando_ordenado(Maps_list) ->
             case Rand_list of
                 [0, 0, 0] -> "" ++ armar_comando_ordenado(Tail);
                 [First, Second, Third] -> 
-                    "@" ++ maps:get("host", Head) ++ ":cpu:" ++ integer_to_list(First) ++ 
-                    ":mem:" ++ integer_to_list(Second) ++ ":gpu:" ++ integer_to_list(Third) ++ 
+                    "@" ++ maps:get("host", Head) ++ 
+                    case First of
+                        0 -> "";
+                        First -> ":cpu:" ++ integer_to_list(First) 
+                    end ++ 
+                    
+                    case Second of
+                        0 -> "";
+                        Second -> ":mem:" ++ integer_to_list(Second) 
+                    end ++ 
+                    
+                    case Third of
+                        0 -> "";
+                        Third -> ":gpu:" ++ integer_to_list(Third) 
+                    end ++
+                 
                     case Tail of 
                         [] -> ""; 
                         _ -> " " 
