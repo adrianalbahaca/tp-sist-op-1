@@ -1,7 +1,8 @@
 CC = gcc
 CFLAGS = -Wall -Iagente_c/include -pthread -g
-SRC = agente_c/src/resource_manager.c agente_c/src/protocol.c agente_c/src/server.c agente_c/src/main.c
+SRC = agente_c/src/resource_manager.c agente_c/src/protocol.c agente_c/src/server.c agente_c/src/main.c agente_c/src/pending_request.c
 TARGET = agente
+PLANIF = planificador.log
 
 ERLC       = erlc
 ERLC_FLAGS = -W
@@ -37,7 +38,7 @@ run-erl: $(ERL_BEAM)
 	erl -pa planificador_erl -noshell -s c_agent_client start
 
 clean:
-	rm -f $(TARGET) $(ERL_BEAM)
+	rm -f $(TARGET) $(ERL_BEAM) $(PLANIF)
 
 
 # Comandos a ejecutar en cada terminal para correr el programa en una pc
