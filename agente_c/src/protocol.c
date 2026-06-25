@@ -139,6 +139,9 @@ denied_msg_t parse_denied(const char* msg) {
     return result;
 }
 
+/**
+ * El parseo de JOB_REQUEST es el más complejo porque requiere una lista de recursos a solicitar
+ */
 job_request_t parse_job_request(const char* buf) {
     job_request_t result;
     result.valido = false;
@@ -159,25 +162,31 @@ job_request_t parse_job_request(const char* buf) {
     char* token = strtok_r(msg, " ", &saveptr);
     token = strtok_r(NULL, " ", &saveptr);
 
-    char ip[16];
-    int c_amt, m_amt, g_amt;
+    char ip[16], rec[7];
+    int c_amt;
 
     // Iterar sobre cada bloque contiguo separado por espacios
     while ((token = strtok_r(NULL, " ", &saveptr)) != NULL) {
         // Máscara exacta para el formato: @10.0.0.10:cpu:2:mem:10:gpu:1
-        if (sscanf(token, "@%15[^:]:cpu:%d:mem:%d:gpu:%d", ip, &c_amt, &m_amt, &g_amt) == 4) {
-            
-            // Inserción condicional para evitar reservar 0 unidades
-            if (c_amt > 0) {
-                resource_list_insert(&result.request_list, ip, RESOURCE_CPU, c_amt);
+        if (sscanf(token, "@%15[^:]:%7[^:]:%d", ip, rec, &c_amt) == 3) {
+            resource_t type;
+            if (strcmp(rec, "cpu") == 0) {
+                type = RESOURCE_CPU;
             }
-            if (m_amt > 0) {
-                resource_list_insert(&result.request_list, ip, RESOURCE_MEM, m_amt);
+            else if (strcmp(rec, "mem") == 0) {
+                type = RESOURCE_MEM;
             }
-            if (g_amt > 0) {
-                resource_list_insert(&result.request_list, ip, RESOURCE_GPU, g_amt);
+            else if (strcmp(rec, "gpu") == 0) {
+                type = RESOURCE_GPU;
             }
-            
+            else {
+                resource_list_destroy(result.request_list);
+                free(msg);
+                return result;
+            }
+            if (c_amt > 0)
+                resource_list_insert(&result.request_list, ip, type, c_amt);
+
         } else {
             resource_list_destroy(result.request_list);
             free(msg);

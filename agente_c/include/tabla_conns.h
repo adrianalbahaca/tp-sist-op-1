@@ -1,7 +1,8 @@
 #ifndef TABLA_CONNS_H
 #define TABLA_CONNS_H
 
-#include "../include/server.h"
+#include "server.h"
+#include <pthread.h>
 
 // Se selecciona un numero primo chico por cuestiones de optimización
 #define TAM_TABLA_CONN 71

@@ -1,0 +1,64 @@
+Conectado al agente C en el puerto 8000
+Mensaje enviado: GET_NODES
+Entrando a masterloop...
+ESPERANDO
+Job 66 trabajando...
+ESPERANDO
+Job 130 trabajando...
+ESPERANDO
+Job 130 finalizó. Solicitando RELEASE general.
+Job 66 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 322 trabajando...
+ESPERANDO
+Job 386 trabajando...
+ESPERANDO
+Job 322 finalizó. Solicitando RELEASE general.
+Job 386 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 578 trabajando...
+ESPERANDO
+Job 642 trabajando...
+ESPERANDO
+Job 578 finalizó. Solicitando RELEASE general.
+Job 642 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 898 trabajando...
+ESPERANDO
+Job 834 trabajando...
+ESPERANDO
+Job 898 finalizó. Solicitando RELEASE general.
+Job 834 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 1090 trabajando...
+ESPERANDO
+Job 1154 trabajando...
+ESPERANDO
+Job 1154 finalizó. Solicitando RELEASE general.
+Job 1090 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 1410 trabajando...
+ESPERANDO
+Job 1410 finalizó. Solicitando RELEASE general.
+Job 1346 (Timeout). Abortando.
+ESPERANDO
+Job 1538 trabajando...
+ESPERANDO
+Job 1602 trabajando...
+ESPERANDO
+Job 1538 finalizó. Solicitando RELEASE general.
+Job 1602 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 1794 trabajando...
+ESPERANDO
+Job 1858 trabajando...
+ESPERANDO
+Job 1858 finalizó. Solicitando RELEASE general.
+Job 1794 finalizó. Solicitando RELEASE general.
+ESPERANDO
+Job 2050 trabajando...
+ESPERANDO
+Job 2114 trabajando...
+ESPERANDO
+Job 2050 finalizó. Solicitando RELEASE general.
+Job 2114 finalizó. Solicitando RELEASE general.

@@ -3,8 +3,10 @@
 
 #define TAM_TABLA_JOBS 71 
 
-#include "../include/resource_types.h"
-#include "../include/server.h"
+#include "resource_types.h"
+#include "server.h"
+
+#include <pthread.h>
 
 // La tabla de jobs será una tabla hash con función de hasheo simple
 typedef struct Allocation {
