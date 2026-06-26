@@ -303,11 +303,11 @@ static void release_resource(resource_t tipo, int amount) {
         
         if (granted_list == NULL) {
             granted_list = pending;
-            granted_tail = pending;
         } else {
             granted_tail->sig = pending;
-            granted_tail = pending;
         }
+
+        granted_tail = pending;
     }
     // Liberamos el lock del recurso ANTES de interactuar con la tabla para evitar interbloqueos
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
@@ -329,27 +329,6 @@ static void release_resource(resource_t tipo, int amount) {
             printf("[TX] A AGENTE REMOTO (fd %d) -> %s", curr->owner_conn->fd, buf);
             enqueue_write(g_epfd, curr->owner_conn, buf);
         }
-        /*
-        // 2. Notificamos por red al dueño
-        // char buf[BUFF_SIZE];
-        if (curr->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
-            bool completo = decrementar_job_grants(curr->job_id);
-            if (completo) {
-                connection_t *owner = buscar_job_owner(curr->job_id);
-                if (owner != NULL) {
-                    char buf[BUFF_SIZE];
-                    snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", curr->job_id);
-                    printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
-                    enqueue_write(g_epfd, owner, buf);
-                }
-                eliminar_job_owner(curr->job_id);
-            }
-        } else {
-            char buf[BUFF_SIZE];
-            snprintf(buf, sizeof(buf), "GRANTED %d\n", curr->job_id);
-            printf("[TX] A AGENTE REMOTO (fd %d) -> %s", curr->owner_conn->fd, buf);
-            enqueue_write(g_epfd, curr->owner_conn, buf);
-        }*/
         
         free(curr);
         curr = next;

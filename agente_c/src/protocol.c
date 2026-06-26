@@ -231,6 +231,10 @@ job_status_msg_t parse_job_status(const char* msg) {
     return result;
 }
 
+/**
+ * Este es el parseo del comando ANNOUNCE
+ * Este código permite recibir un ANNOUNCE cualquiera sin importar el orden de los recursos que recibe
+ */
 announce_msg_t parse_announce(const char* msg) {
     
     char temp[256];
@@ -280,28 +284,6 @@ announce_msg_t parse_announce(const char* msg) {
         fprintf(stderr, "ANNOUNCE mal formado - faltan: %s\n", msg);
         return result;
     }
-    
-    /*
-    announce_msg_t result;
-    result.valido = false;
-
-    // Parsear el mensaje
-    int puerto, cpu, mem, gpu;
-
-    int n = sscanf(msg, "ANNOUNCE %d cpu:%d mem:%d gpu:%d", &puerto, &cpu, &mem, &gpu);
-    if (n != 4) {
-        if (4 == sscanf(msg, "ANNOUNCE %d cpu:%d gpu:%d mem:%d", &puerto, &cpu, &gpu, &mem)) {
-            result.cpu = cpu;
-            result.mem = mem;
-            result.gpu = gpu;
-            result.puerto = puerto;
-            result.valido = true;
-
-            return result;
-        }
-        fprintf(stderr, "ANNOUNCE mal formado: %s\n", msg);
-        return result;
-    }*/
 
     result.cpu = cpu;
     result.mem = mem;
