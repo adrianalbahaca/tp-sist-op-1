@@ -38,7 +38,7 @@ sleep 1
 
 # 2. Despliegue de Agentes
 echo "[*] Desplegando middleware HPC (Nodos A y B)..."
-sudo ip netns exec pc_azul stdbuf -oL -eL ./agente 10.0.0.10 8000 2 8192 0 < /dev/null > nodo_a.log 2>&1 &
+sudo ip netns exec pc_azul stdbuf -oL -eL ./agente 10.0.0.10 8000 2 8192 1 < /dev/null > nodo_a.log 2>&1 &
 sudo ip netns exec pc_roja stdbuf -oL -eL ./agente 10.0.0.20 8000 2 8192 1 < /dev/null > nodo_b.log 2>&1 &
 sleep 3
 
@@ -49,7 +49,7 @@ echo "[*] Emitiendo colisión masiva (Lectura Activa del Socket):"
 sudo ip netns exec pc_azul bash -c '
     # Abrir socket bidireccional en File Descriptor 3
     exec 3<>/dev/tcp/127.0.0.1/8000
-    echo "JOB_REQUEST 1001 @10.0.0.10:cpu:2" >&3
+    echo "JOB_REQUEST 1001 @10.0.0.10:cpu:2 @10.0.0.20:gpu:1" >&3
     
     # Leer pacientemente la respuesta del Agente C (timeout de seguridad 15s)
     while read -t 15 -u 3 line; do
@@ -67,7 +67,7 @@ sudo ip netns exec pc_azul bash -c '
 # Cliente Simulado en Nodo Rojo (Job 1002)
 sudo ip netns exec pc_roja bash -c '
     exec 3<>/dev/tcp/127.0.0.1/8000
-    echo "JOB_REQUEST 1002 @10.0.0.10:gpu:1 @10.0.0.20:cpu:2" >&3
+    echo "JOB_REQUEST 1002 @10.0.0.20:gpu:1 @10.0.0.10:cpu:2" >&3
     
     while read -t 15 -u 3 line; do
         if [[ "$line" == *"JOB_GRANTED"* ]]; then
@@ -94,3 +94,5 @@ echo "----------------------------------------------------"
 echo "Auditoría Nodo Rojo (10.0.0.20) [Ciclo Completo Validado]:"
 grep -E "RX|TX" nodo_b.log | sed 's/^/  /'
 echo "----------------------------------------------------"
+
+# PENDIENTE: Editar el script una vez se tenga el Erlang para que haga el test de deadlock
