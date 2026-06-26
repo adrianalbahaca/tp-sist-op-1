@@ -1,5 +1,5 @@
 -module(c_agent_client).
--export([start/0, map_gen/1, node_map/1, armar_lista/1]).
+-export([start/0, map_gen/1, node_map/1, armar_lista/1, get_nodes/1]).
 -export([get_list_maps/1, masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2]).
 
 -define(PORT, 8000).
@@ -152,14 +152,47 @@ registrar_log(JobId, Estado, Detalle) ->
     % Abre el archivo en modo append (agregar al final) y escribe de forma segura
     file:write_file("planificador.log", LogTexto, [append]).
 
+get_nodes(Socket) ->
+    gen_tcp:send(Socket, ?GET_NODES),
+    %io:format("Mensaje enviado: ~s", [?GET_NODES]),
+    
+    case gen_tcp:recv(Socket, 0, 5000) of
+        {ok, "NODES " ++ Data} ->
+            Data_listed = string:split(string:trim(Data), ";", all), 
+            
+            % A cada elemento de Data_Listed, le hacemos split por ":",
+            % le ponemos "host" al inicio, le aplicamos armar_lista y
+            % la convertimos en un mapa
+            ListDeMapas = [
+                maps:from_list(armar_lista(["host" | string:split(Nodo, ":", all)]))
+                || Nodo <- Data_listed, Nodo /= ""
+            ],
+            
+            ListDeMapas;
+
+        _ ->
+            io:format("Error: No se pudo recibir la información sobre los nodos~n"),
+            gen_tcp:close(Socket),
+            []
+    end.
+
 % Loop principal del proceso master
 masterloop(Maps_list, Socket, HandlersMap) ->
     % Si el mapa se vació, significa que la ráfaga anterior terminó con éxito. Disparamos otra.
+    
+    % Si terminó la ráfaga, actualizamos la lista de nodos    
+    NuevoMapsList = 
+        case maps:size(HandlersMap) of
+            0 -> get_nodes(Socket);
+            _ -> Maps_list
+        end,
+
+    % Y luego, mandamos otra
     MapConJobs = 
         case maps:size(HandlersMap) of
             0 -> 
                 sleep(1000 + rand:uniform(2000)), % Pausa para no saturar al Agente
-                disparar_rafaga(Maps_list, Socket, ?RAFAGA, HandlersMap);
+                disparar_rafaga(NuevoMapsList, Socket, ?RAFAGA, HandlersMap);
             _ -> 
                 HandlersMap
         end,
@@ -170,10 +203,10 @@ masterloop(Maps_list, Socket, HandlersMap) ->
             gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(JobIdToRelease) ++ "\n"),
             % Sacamos el Job del mapa para que maps:size() eventualmente llegue a cero
             CleanMapInterno = maps:remove(JobIdToRelease, MapConJobs),
-            masterloop(Maps_list, Socket, CleanMapInterno)
-    after 1 -> 
+            masterloop(NuevoMapsList, Socket, CleanMapInterno)
+    after 0 -> 
         % Si no hay liberaciones internas, escuchamos lo que llega de la red (Agente C)
-        io:format("ESPERANDO~n"),
+        %io:format("ESPERANDO~n"),
         case gen_tcp:recv(Socket, 0, 5000) of
             {ok, LineaConSalto} ->
                 % Removemos el \n de la línea
@@ -189,7 +222,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
 
                 case TipoMensaje of
                     desconocido ->
-                        masterloop(Maps_list, Socket, MapConJobs);
+                        masterloop(NuevoMapsList, Socket, MapConJobs);
                     _ ->
                         JobIdRecibido = list_to_integer(string:trim(IdCrudo)),
                         case maps:find(JobIdRecibido, MapConJobs) of
@@ -203,14 +236,14 @@ masterloop(Maps_list, Socket, HandlersMap) ->
                                     timeout -> registrar_log(JobIdRecibido, "EXPIRADO", "Tiempo de espera agotado.")
                                 end,
 
-                                masterloop(Maps_list, Socket, MapConJobs);
+                                masterloop(NuevoMapsList, Socket, MapConJobs);
                             error ->
-                                masterloop(Maps_list, Socket, MapConJobs)
+                                masterloop(NuevoMapsList, Socket, MapConJobs)
                         end
                 end;
 
             {error, timeout} ->
-                masterloop(Maps_list, Socket, MapConJobs);
+                masterloop(NuevoMapsList, Socket, MapConJobs);
             
             {error, Reason} ->
                 io:format("Error crítico con el Agente C: ~p~n", [Reason])
@@ -225,30 +258,14 @@ start() ->
         {ok, Socket} ->
             io:format("Conectado al agente C en el puerto ~p~n", [?PORT]),
             register(master, self()),
+    
+            % Arrancamos el masterloop con un mapa de jobs pendientes
+            % Y uno de nodos, ambos vacíos #{}
+            io:format("Entrando a masterloop...~n"),
+            masterloop([], Socket, #{}),
+            gen_tcp:close(Socket);
             
-            % Solicitamos la información sobre nodos
-            gen_tcp:send(Socket, ?GET_NODES),
-            io:format("Mensaje enviado: ~s", [?GET_NODES]),
             
-            % La recibimos con un tiempo de espera máximo de 5 segundos
-            case gen_tcp:recv(Socket, 0, 5000) of
-                {ok, "NODES " ++ Data} ->
-                    Data_listed = string:split(Data, ";", all), 
-                    map_gen(Data_listed), 
-                    
-                    % Armamos la lista de mapas para más comodidad en el manejo de datos
-                    % Cada mapa representa un nodo
-                    Maps_list = get_list_maps(length(Data_listed)), 
-                    io:format("Entrando a masterloop...~n"),
-                    
-                    % Arrancamos el masterloop con un mapa de jobs pendientes vacío #{}
-                    masterloop(Maps_list, Socket, #{}),
-                    gen_tcp:close(Socket);
-                
-                _ ->
-                    io:format("Error: No se pudo recibir la información sobre los nodos~n"),
-                    gen_tcp:close(Socket)
-            end;
         {error, Reason} ->
             io:format("Conexión fallida: ~p~n", [Reason])
     end.
