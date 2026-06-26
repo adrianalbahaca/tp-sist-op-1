@@ -272,6 +272,9 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
         manager.recursos[tipo].available_amount -= amount;
         result = RM_GRANTED;
     }
+    else if (manager.recursos[tipo].total_amount < amount) {
+        result = RM_DENIED;
+    }
     else {
         queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn);
         result = RM_QUEUED;
@@ -531,6 +534,12 @@ void process_message(connection_t *conn, char *msg) {
                 tabla_jobs_insert(&manager.tabla, conn, result.job_id, result.type, result.amount);
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
+                printf("[TX] A %s (fd %d) -> %s", origen, conn->fd, buf);
+                enqueue_write(g_epfd, conn, buf);
+            }
+            else if (r == RM_DENIED) {
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "DENIED %d\n", result.job_id);
                 printf("[TX] A %s (fd %d) -> %s", origen, conn->fd, buf);
                 enqueue_write(g_epfd, conn, buf);
             }
