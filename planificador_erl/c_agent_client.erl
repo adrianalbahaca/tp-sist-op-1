@@ -1,12 +1,13 @@
 -module(c_agent_client).
 -export([start/0, map_gen/1, node_map/1, armar_lista/1, get_nodes/1]).
 -export([get_list_maps/1, masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2]).
+-export([test_deadlock1/0, test_deadlock2/0]).
 
 -define(PORT, 8000).
 -define(HOST, "localhost").
 -define(GET_NODES, "GET_NODES\n").
 
--define(RAFAGA, 2).
+-define(RAFAGA, 3).
 
 % Arma la lista de pares que luego se utilizará para armar el mapa del nodo correspondiente
 armar_lista(Node_listed) -> 
@@ -51,14 +52,29 @@ rand_desde_cero(N) ->
     rand:uniform(Max + 1) - 1.
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock)
-armar_comando(Maps_list) ->
+armar_comando1(Maps_list) -> 
     %ListaOrdenada = lists:sort(
     %    fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
     %    Maps_list
     %),
     %armar_comando_ordenado(ListaOrdenada).
+    
     armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
 
+armar_comando(Maps_list) -> 
+    ListaOrdenada = lists:sort(
+        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
+        Maps_list
+    ),
+
+    CantNodos = length(ListaOrdenada),
+    case CantNodos of
+        1 -> armar_comando_ordenado([lists:nth(1, ListaOrdenada)]);
+        _ ->
+            Random1 =  rand:uniform(CantNodos div 2),
+            armar_comando_ordenado([lists:nth(Random1, ListaOrdenada)]
+                                    ++ [lists:nth(Random1 * 2, ListaOrdenada)])
+    end.
 
 % Arma el comando una vez ordenada la lista de nodos
 armar_comando_ordenado(Maps_list) ->
@@ -108,14 +124,14 @@ job_handler(Job_id, _GrantsEsperados) ->
             granted ->
                 io:format("Job ~p trabajando...~n", [Job_id]),
                 sleep(1000 + rand:uniform(4000)),
-                io:format("Job ~p finalizó. Solicitando RELEASE general.~n", [Job_id]),
+                io:format("Job ~p finalizó. Solicitando RELEASE...~n", [Job_id]),
                 master ! {release, Job_id};
             denied ->
-                io:format("Job ~p DENEGADO. Abortando transacción.~n", [Job_id]),
+                io:format("Job ~p DENEGADO. Abortando...~n", [Job_id]),
                 master ! {release, Job_id}
             after 5000 ->
                 % Paso algo raro, demasiado tiempo esperando
-                io:format("Job ~p (Timeout). Abortando.~n", [Job_id]),
+                io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
                 master ! {release, Job_id}
         end.
 
@@ -251,7 +267,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
     end.
 % Función para iniciar el cliente de Erlang
 start() ->
-    rand:seed(exsplus), % Similar a srand(time(NULL)) en C
+    rand:seed(exsp), % Similar a srand(time(NULL)) en C
 
     % Nos conectamos al agente C
     case gen_tcp:connect(?HOST, ?PORT, [list, {packet, line}, {active, false}]) of
@@ -269,3 +285,34 @@ start() ->
         {error, Reason} ->
             io:format("Conexión fallida: ~p~n", [Reason])
     end.
+
+% Función para el test de deadlock (NODO A)
+test_deadlock1() ->
+    % Nos conectamos al agente C
+    case gen_tcp:connect(?HOST, ?PORT, [list, {packet, line}, {active, false}]) of
+        {ok, Socket} ->
+            io:format("Conectado al agente C en el puerto ~p~n", [?PORT]),
+            register(master, self()),
+    
+            % Arrancamos el masterloop con un mapa de jobs pendientes
+            % Y uno de nodos, ambos vacíos #{}
+            io:format("Testeando cliente A...~n"),
+            
+            %MapsList = get_nodes(Socket),
+            %Comando = armar_comando(MapsList),
+            Job_id = erlang:unique_integer([positive]),
+            gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " @10.0.0.10:cpu:2 @10.0.0.20:gpu:1"),
+            
+            %case gen_tcp:recv(Socket, 0, 5000) of
+            gen_tcp:close(Socket);
+            
+            
+        {error, Reason} ->
+            io:format("Conexión fallida: ~p~n", [Reason])
+    end.
+
+% Función para el test de deadlock (NODO B)
+test_deadlock2() ->
+
+    %gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " @10.0.0.20:gpu:1 @10.0.0.10:cpu:2"),
+    todo.
