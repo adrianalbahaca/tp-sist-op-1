@@ -278,6 +278,7 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
     else {
         queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn);
         result = RM_QUEUED;
+        printf("El job [%d] fue encolando. Esperando...\n", job_id);
     }
 
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);

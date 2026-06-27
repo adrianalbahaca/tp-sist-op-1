@@ -86,8 +86,8 @@ for i in $(seq 1 "$N_PCS"); do
     nombre="pc${i}"
     PC_NAMES+=("$nombre")
     IPS[$nombre]="10.0.0.${i}"
-    CPUS[$nombre]=$((2 + i))          # pc1->3, pc2->4, pc3->5, ...
-    MEMS[$nombre]=$((4096 * i))       # pc1->4096, pc2->8192, pc3->12288, ...
+    CPUS[$nombre]=$((2 * i))          # pc1->3, pc2->4, pc3->5, ...
+    MEMS[$nombre]=$((8192 * i))       # pc1->4096, pc2->8192, pc3->12288, ...
     GPUS[$nombre]=$((i % 2))          # alterna 1, 0, 1, 0, ...
 done
 
@@ -179,7 +179,7 @@ for ns in "${PC_NAMES[@]}"; do
 done
 
 echo "[*] Corriendo. Dejando que los planificadores disparen unas ráfagas de jobs (60s)..."
-sleep 60
+sleep 120
 
 echo "[*] Deteniendo todas las instancias de Erlang..."
 sudo pkill -9 -f "c_agent_client" 2>/dev/null

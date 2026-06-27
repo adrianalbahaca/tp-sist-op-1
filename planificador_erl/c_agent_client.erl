@@ -7,7 +7,7 @@
 -define(HOST, "localhost").
 -define(GET_NODES, "GET_NODES\n").
 
--define(RAFAGA, 3).
+-define(RAFAGA, 2).
 
 % Arma la lista de pares que luego se utilizará para armar el mapa del nodo correspondiente
 armar_lista(Node_listed) -> 
@@ -48,7 +48,7 @@ get_list_maps(N) ->
 % Similar a rand:uniform, pero desde 0 a N/3
 rand_desde_cero(0) -> 0;
 rand_desde_cero(N) -> 
-    Max = max(1, N div 3), 
+    Max = max(1, N div 6), 
     rand:uniform(Max + 1) - 1.
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock)
@@ -129,7 +129,7 @@ job_handler(Job_id, _GrantsEsperados) ->
             denied ->
                 io:format("Job ~p DENEGADO. Abortando...~n", [Job_id]),
                 master ! {release, Job_id}
-            after 5000 ->
+            after 30000 ->
                 % Paso algo raro, demasiado tiempo esperando
                 io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
                 master ! {release, Job_id}
