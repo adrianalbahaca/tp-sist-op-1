@@ -317,13 +317,13 @@ test_deadlock1() ->
             gen_tcp:send(Socket, Mensaje),
 
             case gen_tcp:recv(Socket, 0, 5000) of
-                {ok, "JOB_GRANTED " ++ Job_id} ->
+                {ok, "JOB_GRANTED " ++ _Resto} ->
                     io:fwrite("Job de A está trabajando...~n"),
                     sleep(2000),
                     gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n");
                 
-                {ok, "JOB_DENIED " ++ _Job_id} -> io:fwrite("El Job de A fue denegado: ~n");
-                {ok, "JOB_TIMEOUT " ++ _Job_id} -> io:fwrite("El Job de A expiró: ~n");
+                {ok, "JOB_DENIED " ++ _Resto} -> io:fwrite("El Job de A fue denegado: ~n");
+                {ok, "JOB_TIMEOUT " ++ _Resto} -> io:fwrite("El Job de A expiró: ~n");
                 {error, Reason} -> io:fwrite("Error de recepción: ~p~n", [Reason])
             end,
 
@@ -355,7 +355,7 @@ test_deadlock2() ->
             gen_tcp:send(Socket, Mensaje),
 
             case gen_tcp:recv(Socket, 0, 5000) of
-                {ok, "JOB_GRANTED " ++ Job_id} ->
+                {ok, "JOB_GRANTED " ++ _Resto} ->
                     io:fwrite("Job de B está trabajando...~n"),
                     sleep(2000),
                     gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n");
