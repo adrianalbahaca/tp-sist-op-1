@@ -1,6 +1,6 @@
 -module(c_agent_client).
 -export([start/0, map_gen/1, node_map/1, armar_lista/1, get_nodes/1]).
--export([get_list_maps/1, masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2]).
+-export([get_list_maps/1, masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2, host_sort/1]).
 -export([test_deadlock1/0, test_deadlock2/0]).
 
 -define(PORT, 8000).
@@ -51,8 +51,14 @@ rand_desde_cero(N) ->
     Max = max(1, N div 6), 
     rand:uniform(Max + 1) - 1.
 
-% Ordena los nodos según el valor de "host" (Estrategia anti-deadlock)
-armar_comando1(Maps_list) -> 
+% Ordena los nodos según el valor de "host" (Estrategia anti-deadlock) 
+host_sort(Maps_list) ->
+    lists:sort(
+        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
+        Maps_list
+    ).
+
+armar_comando1(Maps_list, Test) -> 
     %ListaOrdenada = lists:sort(
     %    fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
     %    Maps_list
@@ -61,13 +67,13 @@ armar_comando1(Maps_list) ->
     
     armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
 
+% Primera parte de "armar_comando"
+% Ordena la lista de nodos y arma el comando de JOB_REQUEST 
+% que se enviará al agente c 
 armar_comando(Maps_list) -> 
-    ListaOrdenada = lists:sort(
-        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
-        Maps_list
-    ),
-
+    ListaOrdenada = host_sort(Maps_list),
     CantNodos = length(ListaOrdenada),
+
     case CantNodos of
         1 -> armar_comando_ordenado([lists:nth(1, ListaOrdenada)]);
         _ ->
@@ -76,7 +82,9 @@ armar_comando(Maps_list) ->
                                     ++ [lists:nth(Random1 * 2, ListaOrdenada)])
     end.
 
-% Arma el comando una vez ordenada la lista de nodos
+
+
+% Segunda parte de "armar_comando"
 armar_comando_ordenado(Maps_list) ->
     case Maps_list of
         [] -> "";
@@ -288,31 +296,76 @@ start() ->
 
 % Función para el test de deadlock (NODO A)
 test_deadlock1() ->
-    % Nos conectamos al agente C
     case gen_tcp:connect(?HOST, ?PORT, [list, {packet, line}, {active, false}]) of
-        {ok, Socket} ->
-            io:format("Conectado al agente C en el puerto ~p~n", [?PORT]),
-            register(master, self()),
     
-            % Arrancamos el masterloop con un mapa de jobs pendientes
-            % Y uno de nodos, ambos vacíos #{}
-            io:format("Testeando cliente A...~n"),
-            
-            %MapsList = get_nodes(Socket),
-            %Comando = armar_comando(MapsList),
+        {ok, Socket} ->
+
+            NodoAzul = maps:from_list([{"host", "10.0.0.10"}, {"recurso", "cpu:2"}]),
+            NodoRojo = maps:from_list([{"host", "10.0.0.20"}, {"recurso", "gpu:1"}]),
+            Ordenados = host_sort([NodoAzul, NodoRojo]), % Pedir CPU primero
+
+            % Armamos el string a partir del orden YA decidido por la función
+            Comando = lists:foldl(
+                fun(Map, Acc) -> Acc ++ "@" ++ maps:get("host", Map) ++ ":" ++ maps:get("recurso", Map) ++ " " end,
+                "",
+                Ordenados
+            ),
+
             Job_id = erlang:unique_integer([positive]),
-            gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " @10.0.0.10:cpu:2 @10.0.0.20:gpu:1"),
-            
-            %case gen_tcp:recv(Socket, 0, 5000) of
+            Mensaje = "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ string:trim(Comando) ++ "\n",
+            io:fwrite("Cliente A envía: " ++ Mensaje),
+            gen_tcp:send(Socket, Mensaje),
+
+            case gen_tcp:recv(Socket, 0, 5000) of
+                {ok, "JOB_GRANTED " ++ Job_id} ->
+                    io:fwrite("Job de A está trabajando...~n"),
+                    sleep(2000),
+                    gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n");
+                
+                {ok, "JOB_DENIED " ++ _Job_id} -> io:fwrite("El Job de A fue denegado: ~n");
+                {ok, "JOB_TIMEOUT " ++ _Job_id} -> io:fwrite("El Job de A expiró: ~n");
+                {error, Reason} -> io:fwrite("Error de recepción: ~p~n", [Reason])
+            end,
+
             gen_tcp:close(Socket);
-            
-            
-        {error, Reason} ->
-            io:format("Conexión fallida: ~p~n", [Reason])
+
+        {error, Reason} -> io:format("Conexión fallida: ~p~n", [Reason])
     end.
 
 % Función para el test de deadlock (NODO B)
 test_deadlock2() ->
+    case gen_tcp:connect(?HOST, ?PORT, [list, {packet, line}, {active, false}]) of
+    
+        {ok, Socket} ->
 
-    %gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " @10.0.0.20:gpu:1 @10.0.0.10:cpu:2"),
-    todo.
+            NodoAzul = maps:from_list([{"host", "10.0.0.10"}, {"recurso", "cpu:2"}]),
+            NodoRojo = maps:from_list([{"host", "10.0.0.20"}, {"recurso", "gpu:1"}]),
+            Ordenados = host_sort([NodoRojo, NodoAzul]), % Pedir GPU primero
+
+            % Armamos el string a partir del orden YA decidido por la función
+            Comando = lists:foldl(
+                fun(Map, Acc) -> Acc ++ "@" ++ maps:get("host", Map) ++ ":" ++ maps:get("recurso", Map) ++ " " end,
+                "",
+                Ordenados
+            ),
+
+            Job_id = erlang:unique_integer([positive]),
+            Mensaje = "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ string:trim(Comando) ++ "\n",
+            io:fwrite("Cliente B envía: " ++ Mensaje), % Se reordenó el comando
+            gen_tcp:send(Socket, Mensaje),
+
+            case gen_tcp:recv(Socket, 0, 5000) of
+                {ok, "JOB_GRANTED " ++ Job_id} ->
+                    io:fwrite("Job de B está trabajando...~n"),
+                    sleep(2000),
+                    gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n");
+                
+                {ok, "JOB_DENIED " ++ _Job_id} -> io:fwrite("El Job de B fue denegado: ~n");
+                {ok, "JOB_TIMEOUT " ++ _Job_id} -> io:fwrite("El Job de B expiró: ~n");
+                {error, Reason} -> io:fwrite("Error de recepción: ~p~n", [Reason])
+            end,
+
+            gen_tcp:close(Socket);
+
+        {error, Reason} -> io:format("Conexión fallida: ~p~n", [Reason])
+    end.
