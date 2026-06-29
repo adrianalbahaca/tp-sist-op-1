@@ -278,7 +278,6 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
     else {
         queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn);
         result = RM_QUEUED;
-        printf("El job [%d] fue encolando. Esperando...\n", job_id);
     }
 
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
@@ -297,10 +296,19 @@ static void release_resource(resource_t tipo, int amount) {
     PendingRequest *granted_list = NULL;
     PendingRequest *granted_tail = NULL;
 
+    if (queue_is_empty(cola)) {
+        printf("[RELEASE] tipo %d: cola vacía, nada para desencolar (available=%d)\n", tipo, manager.recursos[tipo].available_amount);
+    } else if (manager.recursos[tipo].available_amount < cola->top->amount) {
+        printf("[RELEASE] tipo %d: cola tiene job %d pidiendo %d, pero solo hay %d disponible\n",
+               tipo, cola->top->job_id, cola->top->amount, manager.recursos[tipo].available_amount);
+    }
+
     // Desencolamos los trabajos que ahora pueden satisfacerse
     while (!queue_is_empty(cola) && manager.recursos[tipo].available_amount >= cola->top->amount) {
         PendingRequest* pending = queue_dequeue(cola);
         manager.recursos[tipo].available_amount -= pending->amount;
+        printf("[DEQUEUE] Job %d desencolado (tipo %d, amount %d, available_restante %d)\n",
+               pending->job_id, tipo, pending->amount, manager.recursos[tipo].available_amount);
         
         if (granted_list == NULL) {
             granted_list = pending;
@@ -372,6 +380,8 @@ void avanzar_reserva(int job_id) {
     }
     
     if (curr == NULL) {
+        printf("[AVANZAR_RESERVA] Job %d: NO se encontró en job_owners. Se ignora silenciosamente.\n", job_id);
+        fflush(stdout);
         pthread_mutex_unlock(&mutex_job_owners);
         return;
     }
@@ -501,6 +511,12 @@ void process_message(connection_t *conn, char *msg) {
     // Identificación del origen para el log de mi consola
     const char *origen = (conn->type == CONN_TCP_CLIENT_LOCAL) ? "ERLANG LOCAL" : "AGENTE REMOTO";
     printf("[RX] De %s (fd %d) -> %s\n", origen, conn->fd, msg);
+    printf("[DEBUG_BYTES] len=%zu primeros_bytes=", strlen(msg));
+    for (size_t i = 0; i < strlen(msg) && i < 15; i++) {
+        printf("%02x ", (unsigned char)msg[i]);
+    }
+    printf("\n");
+    fflush(stdout);
     // Se parsea la primera palabra usando caso por caso dependiendo del primer comando
     /**
      * RESERVE <job_id> <recurso> <amount>
@@ -534,6 +550,7 @@ void process_message(connection_t *conn, char *msg) {
         release_msg_t result = parse_release(msg);
 
         if (result.valido) {
+            release_resource(result.type, result.amount);
             tabla_jobs_remove(&manager.tabla, result.job_id);
 
             // PURGA DE FANTASMAS
@@ -730,7 +747,9 @@ void process_message(connection_t *conn, char *msg) {
             snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
                      result.job_id, result.job_id, result.job_id);
 
+            printf("[LOCK] intentando tomar tabla_conns.mutex en BROADCAST (JOB_RELEASE)\n"); fflush(stdout);
             pthread_mutex_lock(&tabla_conns.mutex);
+            printf("[LOCK] tomado tabla_conns.mutex en BROADCAST\n"); fflush(stdout);
             for (int i = 0; i < TAM_TABLA_CONN; i++) {
                 ConnEntry *curr = tabla_conns.buckets[i];
                 while (curr != NULL) {

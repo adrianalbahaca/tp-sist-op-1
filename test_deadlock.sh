@@ -42,9 +42,23 @@ sleep 1
 
 # 2. Despliegue de Agentes C
 echo "[*] Desplegando middleware HPC (Nodos Azul y Rojo)..."
-sudo ip netns exec pc_azul stdbuf -oL -eL ./agente 10.0.0.10 8000 2 8192 1 < /dev/null > nodo_a.log 2>&1 &
-sudo ip netns exec pc_roja stdbuf -oL -eL ./agente 10.0.0.20 8000 2 8192 1 < /dev/null > nodo_b.log 2>&1 &
+sudo ip netns exec pc_azul stdbuf -oL -eL ./agente 10.0.0.10 8000 4 8192 1 < /dev/null > nodo_a.log 2>&1 &
+PID_AGENTE_AZUL=$!
+sudo ip netns exec pc_roja stdbuf -oL -eL ./agente 10.0.0.20 8000 4 8192 1 < /dev/null > nodo_b.log 2>&1 &
+PID_AGENTE_ROJA=$!
 sleep 3
+
+# Verificación temprana: ambos agentes C deben seguir vivos antes de lanzar Erlang
+if ! kill -0 $PID_AGENTE_AZUL 2>/dev/null; then
+    echo "[!] ERROR: el agente C de Azul murió antes de arrancar Erlang. Ver nodo_a.log:"
+    cat nodo_a.log
+    exit 1
+fi
+if ! kill -0 $PID_AGENTE_ROJA 2>/dev/null; then
+    echo "[!] ERROR: el agente C de Rojo murió antes de arrancar Erlang. Ver nodo_b.log:"
+    cat nodo_b.log
+    exit 1
+fi
 
 # 3. Lanzamiento de los clientes Erlang reales, uno por nodo, en paralelo
 echo "[*] Lanzando clientes Erlang (test_deadlock1 / test_deadlock2)..."
@@ -79,6 +93,19 @@ done
 
 # Por si alguno quedó colgado más allá del timeout interno
 kill -9 $PID_AZUL $PID_ROJA 2>/dev/null
+
+# Verificación: ¿los agentes C seguían vivos al final de la espera?
+echo "----------------------------------------------------"
+if kill -0 $PID_AGENTE_AZUL 2>/dev/null; then
+    echo "[OK] Agente C de Azul seguía vivo al finalizar."
+else
+    echo "[!] Agente C de Azul NO estaba vivo al finalizar — posible crash silencioso."
+fi
+if kill -0 $PID_AGENTE_ROJA 2>/dev/null; then
+    echo "[OK] Agente C de Rojo seguía vivo al finalizar."
+else
+    echo "[!] Agente C de Rojo NO estaba vivo al finalizar — posible crash silencioso."
+fi
 
 # 4. Volcado de Auditoría
 stty sane 2>/dev/null

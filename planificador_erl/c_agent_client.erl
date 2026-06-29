@@ -1,6 +1,6 @@
 -module(c_agent_client).
--export([start/0, map_gen/1, node_map/1, armar_lista/1, get_nodes/1]).
--export([get_list_maps/1, masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2, host_sort/1]).
+-export([start/0, armar_lista/1, get_nodes/1]).
+-export([masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2, host_sort/1]).
 -export([test_deadlock1/0, test_deadlock2/0]).
 
 -define(PORT, 8000).
@@ -18,33 +18,6 @@ armar_lista(Node_listed) ->
         [First, Second | Tail] -> [{First, Second}] ++ armar_lista(Tail)
     end.
 
-% Función auxiliar de armado de mapas de nodos
-node_map(Node_listed) ->
-    Node_paired = armar_lista(Node_listed),
-    Map = maps:from_list(Node_paired),
-    master ! Map,
-    map_sent_master.
-
-% Genera los mapas que representan los nodos
-map_gen(Nodes) ->
-    case Nodes of
-        [] -> generation_done;
-        [Head | Tail] -> 
-            Head_listed = string:split(Head, ":", all),
-            spawn(?MODULE, node_map, [["host"] ++ Head_listed]),
-            map_gen(Tail)
-    end.
-
-% Recolecta los mapas de nodos y los junta en una lista
-get_list_maps(N) ->
-    case N of
-        0 -> [];
-        N ->
-            receive
-                Mapa -> [Mapa | get_list_maps(N - 1)]
-            end
-    end.
-
 % Similar a rand:uniform, pero desde 0 a N/3
 rand_desde_cero(0) -> 0;
 rand_desde_cero(N) -> 
@@ -58,7 +31,7 @@ host_sort(Maps_list) ->
         Maps_list
     ).
 
-armar_comando1(Maps_list, Test) -> 
+armar_comando(Maps_list) -> 
     %ListaOrdenada = lists:sort(
     %    fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
     %    Maps_list
@@ -70,19 +43,6 @@ armar_comando1(Maps_list, Test) ->
 % Primera parte de "armar_comando"
 % Ordena la lista de nodos y arma el comando de JOB_REQUEST 
 % que se enviará al agente c 
-armar_comando(Maps_list) -> 
-    ListaOrdenada = host_sort(Maps_list),
-    CantNodos = length(ListaOrdenada),
-
-    case CantNodos of
-        1 -> armar_comando_ordenado([lists:nth(1, ListaOrdenada)]);
-        _ ->
-            Random1 =  rand:uniform(CantNodos div 2),
-            armar_comando_ordenado([lists:nth(Random1, ListaOrdenada)]
-                                    ++ [lists:nth(Random1 * 2, ListaOrdenada)])
-    end.
-
-
 
 % Segunda parte de "armar_comando"
 armar_comando_ordenado(Maps_list) ->
@@ -311,22 +271,21 @@ test_deadlock1() ->
                 Ordenados
             ),
 
-            Job_id = erlang:unique_integer([positive]),
+            Job_id = 1001,
             Mensaje = "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ string:trim(Comando) ++ "\n",
             io:fwrite("Cliente A envía: " ++ Mensaje),
             gen_tcp:send(Socket, Mensaje),
 
-            case gen_tcp:recv(Socket, 0, 5000) of
+            case gen_tcp:recv(Socket, 0, 30000) of
                 {ok, "JOB_GRANTED " ++ _Resto} ->
                     io:fwrite("Job de A está trabajando...~n"),
                     sleep(2000),
                     gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(Job_id) ++ "\n");
                 
-                {ok, "JOB_DENIED " ++ _Resto} -> io:fwrite("El Job de A fue denegado: ~n");
-                {ok, "JOB_TIMEOUT " ++ _Resto} -> io:fwrite("El Job de A expiró: ~n");
+                {ok, "JOB_DENIED " ++ _Job_id} -> io:fwrite("El Job de A fue denegado: ~n");
+                {ok, "JOB_TIMEOUT " ++ _Job_id} -> io:fwrite("El Job de A expiró: ~n");
                 {error, Reason} -> io:fwrite("Error de recepción: ~p~n", [Reason])
             end,
-
             gen_tcp:close(Socket);
 
         {error, Reason} -> io:format("Conexión fallida: ~p~n", [Reason])
@@ -349,12 +308,12 @@ test_deadlock2() ->
                 Ordenados
             ),
 
-            Job_id = erlang:unique_integer([positive]),
+            Job_id = 1002,
             Mensaje = "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ string:trim(Comando) ++ "\n",
             io:fwrite("Cliente B envía: " ++ Mensaje), % Se reordenó el comando
             gen_tcp:send(Socket, Mensaje),
 
-            case gen_tcp:recv(Socket, 0, 5000) of
+            case gen_tcp:recv(Socket, 0, 30000) of
                 {ok, "JOB_GRANTED " ++ _Resto} ->
                     io:fwrite("Job de B está trabajando...~n"),
                     sleep(2000),

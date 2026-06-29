@@ -1,9 +1,3 @@
-*.o
-*.out
-*.beam
+logs*
 agente
-*.log
-planificador.log
-/agente_c/src/borrador.c
-logs/
-.gitignore
+*.beam
