@@ -1,6 +1,7 @@
 # Lista de pendientes
 
 - [ ] Rediseñar el Resource Manager para simplificar las estructuras
+  - [ ] *Revisar cola* -> *Función para imprimir toda la cola*
   - [ ] ¿Posible cola circular con capacidad limitada? -> Muy probable
   - [ ] ¿Uso de monitores? -> Probable -> ¿Cómo armar un monitor para estas estructuras?
   - [ ] ¿Colas con exclusión mutua? -> **SI** -> *Problema de productor-consumidor*
