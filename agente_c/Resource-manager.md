@@ -6,3 +6,4 @@
 - protocol.c -> parsing.c
 - AUMENTAR CANTIDAD DE DOCUMENTACIÓN SOBRE EL PROPÓSITO DE CADA VAINA!!! (Nota personal para mí porque escupo ideas y no anoto nada xd)
 - Mejor usar semáforos y variables de condición para Exclusión Mutua
+- `avanzar_reserva` puede mejorarse y simplificarse?
