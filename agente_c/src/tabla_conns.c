@@ -1,4 +1,4 @@
-#include "../include/tabla_conns.h"
+#include "tabla_conns.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

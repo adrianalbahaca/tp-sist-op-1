@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "../include/server.h"
-#include "../include/resource_manager.h"
+#include "server.h"
+#include "resource_manager.h"
 
 typedef struct {
     char ip[16];

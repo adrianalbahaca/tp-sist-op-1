@@ -2,7 +2,7 @@
 #define PENDING_REQUEST_H
 
 #include <stdbool.h>
-#include "../include/server.h"
+#include "server.h"
 
 typedef struct PendingRequest{
     int job_id;

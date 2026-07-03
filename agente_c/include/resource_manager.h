@@ -1,7 +1,7 @@
 #ifndef RESOURCE_MANAGER_H
 #define RESOURCE_MANAGER_H
 
-#include "../include/server.h"
+#include "server.h"
 
 /**
  * Inicializa la estructura gestor de recursos para el agente C local

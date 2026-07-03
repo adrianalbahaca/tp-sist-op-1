@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
-#include "../include/tabla_jobs.h"
+#include "tabla_jobs.h"
 #include <string.h>
 
 void tabla_jobs_init(TablaJobs *j) {

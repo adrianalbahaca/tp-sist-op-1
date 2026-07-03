@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "../include/pending_request.h"
+#include "pending_request.h"
 #include <stdbool.h>
 
 void queue_init(ColaPendingRequest* c) {

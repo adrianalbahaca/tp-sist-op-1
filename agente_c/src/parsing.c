@@ -1,5 +1,5 @@
-#include "../include/resource_types.h"
-#include "../include/protocol.h"
+#include "resource_types.h"
+#include "parsing.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

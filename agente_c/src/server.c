@@ -1,5 +1,5 @@
-#include "../include/server.h"
-#include "../include/resource_manager.h"
+#include "server.h"
+#include "resource_manager.h"
 
 #include <stdio.h>
 #include <stdlib.h>
