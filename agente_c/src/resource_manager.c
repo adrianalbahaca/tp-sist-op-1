@@ -206,15 +206,23 @@ static void release_resource(resource_t tipo, int amount) {
                tipo, cola->top->job_id, cola->top->amount, manager.recursos[tipo].available_amount);
     }
 
+    char msg[BUFF_SIZE];
     // Desencolamos los trabajos que ahora pueden satisfacerse
     while (!queue_is_empty(cola) && manager.recursos[tipo].available_amount >= cola->top->amount) {
         PendingRequest* pending = queue_dequeue(cola);
         manager.recursos[tipo].available_amount -= pending->amount;
         printf("[DEQUEUE] Job %d desencolado (tipo %d, amount %d, available_restante %d)\n",
                pending->job_id, tipo, pending->amount, manager.recursos[tipo].available_amount);
+        
+        // Enviar cada job dado a su dueño correspondiente
+        snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
+        enqueue_write(g_epfd, pending->owner_conn, msg);
+
+        // Liberar el recurso dado
+        free(pending);
     }
-    // Liberamos el lock del recurso ANTES de interactuar con la tabla para evitar interbloqueos
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
+
 }
 
 /**
