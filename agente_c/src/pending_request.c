@@ -5,6 +5,7 @@
 void queue_init(ColaPendingRequest* c) {
     c->top = NULL;
     c->bottom = NULL;
+    c->amount = 0;
 }
 
 void queue_destroy(ColaPendingRequest* c) {
@@ -41,6 +42,7 @@ void queue_delete_by_conn(ColaPendingRequest *c, connection_t *conn) {
                 c->bottom = prev;
             }
 
+            c->amount -= curr->amount;
             free(curr);
             curr = next;
         }
@@ -59,7 +61,10 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
         if (curr->job_id == job_id) {
             if (prev == NULL) c->top = next;
             else prev->sig = next;
+
             if (c->bottom == curr) c->bottom = prev;
+
+            c->amount -= curr->amount;
             free(curr);
             curr = next; 
         } else {
@@ -70,9 +75,12 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
 }
 
 /**
- * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
+ * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado el mutex del recurso antes
  */
-void queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn) {
+bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount) {
+    if (c->amount + amount > max_amount)
+        return false;
+    
     PendingRequest* pending = malloc(sizeof(PendingRequest));
     pending->job_id = job_id;
     pending->amount = amount;
@@ -87,11 +95,12 @@ void queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* 
         c->bottom->sig = pending;
         c->bottom = pending;
     }
-    return;
+        c->amount += amount;
+    return true;
 }
 
 /**
- * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
+ * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado el mutex del recurso antes
  */
 PendingRequest* queue_dequeue(ColaPendingRequest *c) {
     if (!queue_is_empty(c)) {
@@ -103,6 +112,8 @@ PendingRequest* queue_dequeue(ColaPendingRequest *c) {
         }
 
         tope->sig = NULL;
+
+        c->amount -= tope->amount;
         return tope;
     }
 

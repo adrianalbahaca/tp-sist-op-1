@@ -178,10 +178,10 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
     else if (manager.recursos[tipo].total_amount < amount) {
         result = RM_DENIED;
     }
-    else {
-        queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn);
+    else if (queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn, manager.recursos[tipo].total_amount)) {
         result = RM_QUEUED;
     }
+    else result = RM_DENIED;
 
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
 
@@ -212,39 +212,9 @@ static void release_resource(resource_t tipo, int amount) {
         manager.recursos[tipo].available_amount -= pending->amount;
         printf("[DEQUEUE] Job %d desencolado (tipo %d, amount %d, available_restante %d)\n",
                pending->job_id, tipo, pending->amount, manager.recursos[tipo].available_amount);
-        
-        if (granted_list == NULL) {
-            granted_list = pending;
-        } else {
-            granted_tail->sig = pending;
-        }
-
-        granted_tail = pending;
     }
     // Liberamos el lock del recurso ANTES de interactuar con la tabla para evitar interbloqueos
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
-
-    // Ahora procesamos los trabajos aprobados de forma segura
-    PendingRequest *curr = granted_list;
-    while (curr != NULL) {
-        PendingRequest *next = curr->sig;
-        
-        // Anotamos el trabajo en la tabla oficial para que no sea un fantasma
-        tabla_jobs_insert(&manager.tabla, curr->owner_conn, curr->job_id, tipo, curr->amount);
-        
-        if (curr->owner_conn->type == CONN_TCP_CLIENT_LOCAL) {
-            // El Job local avanzó en la cola local. Reanudar secuencia jerárquica.
-            avanzar_reserva(curr->job_id);
-        } else {
-            char buf[BUFF_SIZE];
-            snprintf(buf, sizeof(buf), "GRANTED %d\n", curr->job_id);
-            printf("[TX] A AGENTE REMOTO (fd %d) -> %s", curr->owner_conn->fd, buf);
-            enqueue_write(g_epfd, curr->owner_conn, buf);
-        }
-        
-        free(curr);
-        curr = next;
-    }
 }
 
 /**
@@ -340,6 +310,8 @@ void avanzar_reserva(int job_id) {
                 enqueue_write(g_epfd, conn_erlang, buf);
                 eliminar_job_owner(job_id);
             } else {
+                // Esto es una inserción sobre la lista en la cabeza
+                // Creación del OutRequests
                 OutReq *out = malloc(sizeof(OutReq));
                 out->conn = nueva;
                 strncpy(out->msg, mensaje, sizeof(out->msg) - 1);
@@ -347,6 +319,7 @@ void avanzar_reserva(int job_id) {
                 strncpy(out->ip, req->ip, sizeof(out->ip) - 1);
                 out->ip[sizeof(out->ip) - 1] = '\0';
 
+                // Inserción en la cabeza de la lista
                 pthread_mutex_lock(&mutex_pendientes_salientes);
                 out->next = pendientes_salientes;
                 pendientes_salientes = out;

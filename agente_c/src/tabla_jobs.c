@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "tabla_jobs.h"
 #include <string.h>
+#include "out_requests.h"
 
 void tabla_jobs_init(TablaJobs *j) {
     memset(j->tabla_jobs, 0, sizeof(j->tabla_jobs));
@@ -73,7 +74,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount) {
+bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount) {
     sem_wait(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -92,7 +93,6 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
     // Sino, crear nuevo Allocation a insertar en el Job buscado
     Job* curr = j->tabla_jobs[idx];
 
-    if (curr->cant_reserva + amount < )
     while (curr != NULL) {
         if (curr->job_id == job_id) {
             // Es una inserción a la cabeza de una lista simplemente enlazada
@@ -102,13 +102,13 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
 
             all->sig = curr->allocations;
             curr->allocations = all;
+            curr->cant_reserva += amount;
             break;
         }
         curr = curr->sig;
     }
-
     sem_post(&j->lock);
-    return;
+    return true;
 }
 
 /**
