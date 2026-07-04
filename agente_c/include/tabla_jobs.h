@@ -26,7 +26,7 @@ typedef struct Allocation {
 typedef struct OutReq {
     connection_t *conn;
     char msg[BUFF_SIZE];
-    char ip[16];
+    char ip[15];
     struct OutReq *next;
 } OutRequest;
 

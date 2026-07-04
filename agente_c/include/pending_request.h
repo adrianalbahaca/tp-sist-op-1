@@ -15,6 +15,7 @@ typedef struct PendingRequest{
 typedef struct {
     PendingRequest *top;
     PendingRequest *bottom;
+    int amount;
 } ColaPendingRequest;
 
 void queue_init(ColaPendingRequest* c);
@@ -30,7 +31,7 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id);
 /**
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
  */
-void queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn);
+bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn);
 
 /**
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
