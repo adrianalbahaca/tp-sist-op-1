@@ -19,10 +19,6 @@ typedef enum {
     RM_DENIED
 } result_t;
 
-static void release_resource(resource_t tipo, int amount);
-static void avanzar_reserva(int job_id);
-
-
 // La cola de requests pendientes se implementará con una lista simplemente enlazad
 
 typedef struct {
@@ -144,7 +140,7 @@ void manager_set_epoll(int epfd) {
     g_epfd = epfd;
 }
 
-static char g_ip[16];
+char g_ip[16];
 
 void manager_set_ip(const char *ip) {
     strncpy(g_ip, ip, sizeof(g_ip) - 1);
@@ -157,99 +153,6 @@ void manager_set_ip(const char *ip) {
  * Funciones Auxiliares de la TablaJobs
  * =====================================================================================
  */
-
-void tabla_jobs_remove(TablaJobs *j, int job_id) {
-    pthread_mutex_lock(&j->mutex);
-    unsigned int idx = job_id % TAM_TABLA_JOBS;
-
-    Job *prev = NULL;
-    Job *start = j->tabla_jobs[idx];
-
-    Allocation *allocs_to_release = NULL;
-
-    while (start != NULL) {
-        if (start->job_id == job_id) {
-            // Desenlazar el Job de la tabla
-            if (prev == NULL) {
-                j->tabla_jobs[idx] = start->sig;
-            } else {
-                prev->sig = start->sig;
-            }
-            
-            // Extraer la lista de asignaciones antes de liberar el Job
-            allocs_to_release = start->allocations;
-            free(start);
-            break;
-        }
-        prev = start;
-        start = start->sig;
-    }
-    // IMPORTANTE: Soltar el lock de la tabla ANTES de invocar a release_resource
-    pthread_mutex_unlock(&j->mutex);
-
-    // Iterar y liberar los recursos fuera de la zona crítica de la tabla
-    Allocation *all = allocs_to_release;
-    while (all != NULL) {
-        Allocation *sig = all->sig;
-        // Ahora release_resource (que invoca tabla_jobs_insert) puede tomar el lock de la tabla sin problemas
-        release_resource(all->name, all->amount);
-        free(all);
-        all = sig;
-    }
-    return;
-}
-
-/**
- * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos
- * (vía release_resource, que SÍ toma su propio lock) y elimina los jobs.
- * NO se llama con j->mutex tomado, porque release_resource necesita tomar
- * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
- */
-void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
-    pthread_mutex_lock(&j->mutex);
-
-    Allocation *allocs_to_release_head = NULL;
-
-    for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
-        Job *prev = NULL;
-        Job *curr = j->tabla_jobs[idx];
-
-        while (curr != NULL) {
-            Job *next = curr->sig;
-
-            if (curr->conn == conn) {
-                if (prev == NULL) {
-                    j->tabla_jobs[idx] = next;
-                } else {
-                    prev->sig = next;
-                }
-
-                Allocation *all = curr->allocations;
-                if (all != NULL) {
-                    Allocation *tail = all;
-                    while(tail->sig != NULL) tail = tail->sig;
-                    tail->sig = allocs_to_release_head;
-                    allocs_to_release_head = all;
-                }
-                free(curr);
-                curr = next;
-            } else {
-                prev = curr;
-                curr = next;
-            }
-        }
-    }
-    pthread_mutex_unlock(&j->mutex);
-
-    Allocation *all = allocs_to_release_head;
-    while (all != NULL) {
-        Allocation *sig = all->sig;
-        release_resource(all->name, all->amount);
-        free(all);
-        all = sig;
-    }
-    return;
-}
 
 /**
  * =====================================================================================

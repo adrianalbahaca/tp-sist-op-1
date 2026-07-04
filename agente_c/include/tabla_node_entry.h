@@ -7,6 +7,14 @@
 // Se selecciona un numero primo chico por cuestiones de optimización
 #define TAM_TABLA_CONN 71
 
+/**
+ * La tabla de nodos conocidos funciona como una caché de nodos para no tener que estar creando un nodo nuevo cada vez
+ * que es necesario conectarse a algún agente
+ * Esta tabla se implementa usando una tabla hash con buckets de listas simplemente enlazadas, con una función que toma 
+ * el IP para hashear
+ */
+
+ // Definición de un bucket de la tabla
 typedef struct NodeEntry {
     char ip[16];
     int puerto;
@@ -15,13 +23,20 @@ typedef struct NodeEntry {
     struct NodeEntry *next;
 } NodeEntry;
 
+// Definición de la tabla
 typedef struct {
     NodeEntry *buckets[TAM_TABLA_CONN];
     pthread_mutex_t mutex;
 } TablaNodos;
 
+/**
+ * Inicialización de la tabla de nodos conocidos
+ */
 void tabla_nodos_init();
 
+/**
+ * Inserta un nodo nuevo, o actualiza un nodo conocido, con los recursos acorde
+ */
 void tabla_nodos_insert_or_update(const char *ip, int puerto, int cpu, int mem, int gpu);
 
 /**
@@ -35,6 +50,9 @@ int tabla_nodos_get_puerto(const char *ip);
  */
 void tabla_nodos_purge(int timeout_secs);
 
+/**
+ * Elimina la tabla de conexiones
+ */
 void tabla_nodos_destroy();
 
 extern TablaNodos tabla_nodos;

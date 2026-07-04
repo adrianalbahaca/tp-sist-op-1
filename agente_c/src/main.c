@@ -6,6 +6,7 @@
 
 #include "server.h"
 #include "resource_manager.h"
+#include "tabla_node_entry.h"
 
 typedef struct {
     char ip[16];

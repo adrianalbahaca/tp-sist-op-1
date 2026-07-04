@@ -53,7 +53,4 @@ void process_connection_ready(connection_t *conn);
  */
 void process_connection_failed(connection_t *conn);
 
-
-void tabla_nodos_purge(int timeout_secs);
-
 #endif

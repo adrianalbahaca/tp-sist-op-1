@@ -2,7 +2,7 @@
 #include <string.h>
 #include "tabla_node_entry.h"
 
-
+// Definición de la tabla de nodos externa en el Resource Manager
 TablaNodos tabla_nodos;
 
 static unsigned int hash_ip(const char *ip) {
@@ -33,6 +33,7 @@ void tabla_nodos_insert_or_update(const char *ip, int puerto, int cpu, int mem, 
     NodeEntry *curr = tabla_nodos.buckets[idx];
     while (curr != NULL) {
         if (strcmp(curr->ip, ip) == 0) {
+            // El nodo es conocido. Actualizar sus datos y su tiempo de búsqueda
             curr->puerto = puerto;
             curr->cpu_disp = cpu;
             curr->mem_disp = mem;
