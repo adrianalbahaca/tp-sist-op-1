@@ -24,6 +24,7 @@ typedef struct Allocation {
 
 typedef struct OutReq {
     char ip[15]; // IP del nodo del cual se solicitó el Job
+    connection_t *conn; // Conexión proveniente de la solicitud del Job
     resource_t tipo; // Tipo de recurso
     int amount; // Cant. a reservar
     struct OutReq *next; // Siguiente solicitud
@@ -86,7 +87,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id);
  * NO se llama con j->mutex tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
-void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
+OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
 
 /**
  * Declaraciones externas para usar en la librería

@@ -105,7 +105,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip) {
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip) {
     pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -150,7 +150,6 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
         curr = curr->sig;
     }
     pthread_mutex_unlock(&j->lock);
-    return true;
 }
 
 /**

@@ -33,58 +33,6 @@ typedef struct {
     TablaJobs tabla;
 } ResourceManager;
 
-typedef struct OutReq {
-    connection_t *conn;
-    char msg[BUFF_SIZE];
-    char ip[16];
-    struct OutReq *next;
-} OutReq;
-
-static OutReq *pendientes_salientes = NULL;
-static pthread_mutex_t mutex_pendientes_salientes = PTHREAD_MUTEX_INITIALIZER;
-
-/**
- * Registro simple job_id -> conn original, para poder reenviar GRANTED/DENIED
- * que llegan de nodos remotos hacia quien hizo el JOB_REQUEST.
- */
-typedef struct JobOwner {
-    int job_id;
-    connection_t *conn;
-    resource_request_t *pending_requests;
-    struct JobOwner *next;
-} JobOwner;
-
-static JobOwner *job_owners = NULL;
-static pthread_mutex_t mutex_job_owners = PTHREAD_MUTEX_INITIALIZER;
-
-// Ahora almacena la lista enlazada de peticiones pendientes
-static void registrar_job_owner(int job_id, connection_t *conn, resource_request_t *reqs) {
-    pthread_mutex_lock(&mutex_job_owners);
-    JobOwner *o = malloc(sizeof(JobOwner));
-    o->job_id = job_id;
-    o->conn = conn;
-    o->pending_requests = reqs;
-    o->next = job_owners;
-    job_owners = o;
-    pthread_mutex_unlock(&mutex_job_owners);
-}
-/*
-static bool decrementar_job_grants(int job_id) {
-    pthread_mutex_lock(&mutex_job_owners);
-    bool completo = false;
-    JobOwner *curr = job_owners;
-    while (curr != NULL) {
-        if (curr->job_id == job_id) {
-            curr->pending_grants--;
-            if (curr->pending_grants == 0) completo = true;
-            break;
-        }
-        curr = curr->next;
-    }
-    pthread_mutex_unlock(&mutex_job_owners);
-    return completo;
-}*/
-
 static char* recurso_type_a_string(resource_t type) {
     switch(type) {
         case RESOURCE_CPU:
@@ -99,47 +47,6 @@ static char* recurso_type_a_string(resource_t type) {
         default:
             break;
     }
-}
-
-static connection_t* buscar_job_owner(int job_id) {
-    pthread_mutex_lock(&mutex_job_owners);
-    JobOwner *curr = job_owners;
-    while (curr != NULL) {
-        if (curr->job_id == job_id) {
-            connection_t *c = curr->conn;
-            pthread_mutex_unlock(&mutex_job_owners);
-            return c;
-        }
-        curr = curr->next;
-    }
-    pthread_mutex_unlock(&mutex_job_owners);
-    return NULL;
-}
-
-static void eliminar_job_owner(int job_id) {
-    pthread_mutex_lock(&mutex_job_owners);
-    JobOwner *curr = job_owners;
-    JobOwner *prev = NULL;
-
-    while (curr != NULL) {
-        if (curr->job_id == job_id) {
-            if (prev == NULL) job_owners = curr->next;
-            else prev->next = curr->next;
-            
-            // Purga de la lista de peticiones en caso de aborto prematuro (DENIED)
-            resource_request_t *req = curr->pending_requests;
-            while(req != NULL) {
-                resource_request_t *next = req->next;
-                free(req);
-                req = next;
-            }
-            free(curr);
-            break;
-        }
-        prev = curr;
-        curr = curr->next;
-    }
-    pthread_mutex_unlock(&mutex_job_owners);
 }
 
 /**
@@ -268,93 +175,6 @@ void manager_init(int cpu, int mem, int gpu) {
     return;
 }
 
-void avanzar_reserva(int job_id) {
-    pthread_mutex_lock(&mutex_job_owners);
-    JobOwner *curr = job_owners;
-    while (curr != NULL) {
-        if (curr->job_id == job_id) break;
-        curr = curr->next;
-    }
-    
-    if (curr == NULL) {
-        printf("[AVANZAR_RESERVA] Job %d: NO se encontró en job_owners. Se ignora silenciosamente.\n", job_id);
-        fflush(stdout);
-        pthread_mutex_unlock(&mutex_job_owners);
-        return;
-    }
-
-    if (curr->pending_requests == NULL) {
-        // Fin de la secuencia. Transacción distribuida exitosa.
-        connection_t *conn_erlang = curr->conn;
-        pthread_mutex_unlock(&mutex_job_owners);
-        
-        char buf[BUFF_SIZE];
-        snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", job_id);
-        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn_erlang->fd, buf);
-        enqueue_write(g_epfd, conn_erlang, buf);
-        eliminar_job_owner(job_id);
-        return;
-    }
-
-    // Extraer atómicamente el próximo recurso de la secuencia
-    resource_request_t *req = curr->pending_requests;
-    curr->pending_requests = req->next;
-    connection_t *conn_erlang = curr->conn;
-    pthread_mutex_unlock(&mutex_job_owners);
-
-    if (strcmp(req->ip, g_ip) == 0) {
-        // Recurso local
-        result_t r = reserve_resource(req->type, req->amount, job_id, conn_erlang);
-        if (r == RM_GRANTED) {
-            tabla_jobs_insert(&manager.tabla, conn_erlang, job_id, req->type, req->amount);
-            free(req);
-            avanzar_reserva(job_id); // Continúa la cadena instantáneamente
-        } else {
-            // RM_QUEUED: Detiene la ejecución. release_resource reanudará la cadena.
-            free(req);
-        }
-    } else {
-        // Recurso remoto
-        char mensaje[BUFF_SIZE];
-        snprintf(mensaje, sizeof(mensaje), "RESERVE %d %s %d\n", job_id, resource_type_to_str(req->type), req->amount);
-
-        connection_t *remote = tabla_conns_lookup(req->ip);
-        if (remote != NULL) {
-            printf("[TX] A AGENTE REMOTO %s (fd %d) -> %s", req->ip, remote->fd, mensaje);
-            enqueue_write(g_epfd, remote, mensaje);
-        } else {
-            int puerto = tabla_nodos_get_puerto(req->ip);
-            connection_t *nueva = NULL;
-            if (puerto != -1) nueva = connect_remote_node(g_epfd, req->ip, puerto);
-
-            if (nueva == NULL) {
-                fprintf(stderr, "Fallo crítico de enrutamiento hacia %s. Abortando Job %d.\n", req->ip, job_id);
-                char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", job_id);
-                enqueue_write(g_epfd, conn_erlang, buf);
-                eliminar_job_owner(job_id);
-            } else {
-                // Esto es una inserción sobre la lista en la cabeza
-                // Creación del OutRequests
-                OutReq *out = malloc(sizeof(OutReq));
-                out->conn = nueva;
-                strncpy(out->msg, mensaje, sizeof(out->msg) - 1);
-                out->msg[sizeof(out->msg) - 1] = '\0';
-                strncpy(out->ip, req->ip, sizeof(out->ip) - 1);
-                out->ip[sizeof(out->ip) - 1] = '\0';
-
-                // Inserción en la cabeza de la lista
-                pthread_mutex_lock(&mutex_pendientes_salientes);
-                out->next = pendientes_salientes;
-                pendientes_salientes = out;
-                pthread_mutex_unlock(&mutex_pendientes_salientes);
-                printf("[I] Iniciando conexión asíncrona hacia %s para enviar: %s", req->ip, mensaje);
-            }
-        }
-        free(req);
-    }
-}
-
 
 // Destruye el gestor de recursos del agente en C local, liberando la memoria
 void manager_destroy() {
@@ -377,28 +197,6 @@ void manager_destroy() {
     pthread_mutex_destroy(&manager.recursos[RESOURCE_CPU].mutex);
     pthread_mutex_destroy(&manager.recursos[RESOURCE_MEM].mutex);
     pthread_mutex_destroy(&manager.recursos[RESOURCE_GPU].mutex);
-
-    pthread_mutex_lock(&mutex_pendientes_salientes);
-    OutReq *curr_req = pendientes_salientes;
-    while (curr_req != NULL) {
-        OutReq *next = curr_req->next;
-        free(curr_req);
-        curr_req = next;
-    }
-    pendientes_salientes = NULL;
-    pthread_mutex_unlock(&mutex_pendientes_salientes);
-    pthread_mutex_destroy(&mutex_pendientes_salientes);
-
-    pthread_mutex_lock(&mutex_job_owners);
-    JobOwner *curr_owner = job_owners;
-    while (curr_owner != NULL) {
-        JobOwner *next = curr_owner->next;
-        free(curr_owner);
-        curr_owner = next;
-    }
-    job_owners = NULL;
-    pthread_mutex_unlock(&mutex_job_owners);
-    pthread_mutex_destroy(&mutex_job_owners);
 
     return;
 }
@@ -472,7 +270,11 @@ void process_message(connection_t *conn, char *msg) {
     else if (strncmp(msg, "GRANTED", 7) == 0) {
         granted_msg_t result = parse_granted(msg);
         if (result.valido) {
-            avanzar_reserva(result.job_id);
+            /**
+             * TODO: Manejar el caso de un GRANTED adecuadamente
+             * Se procesa el pendiente con el job_id dado
+             * Si la lista de pendientes a procesar se vacía, avisar con algún indicador y enviar un JOB_GRANTED a conn
+             */
         } else {
             fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
         }
@@ -490,7 +292,6 @@ void process_message(connection_t *conn, char *msg) {
                 printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
                 enqueue_write(g_epfd, owner, buf);
             }
-            eliminar_job_owner(result.job_id);
         } else {
             fprintf(stderr, "DENIED mal formado: %s\n", msg);
         }
@@ -712,47 +513,6 @@ void process_disconnect(connection_t *conn) {
     // Luego, para la tabla de jobs, es necesario eliminarlos de la tabla de Jobs
     tabla_jobs_delete_by_conn(&manager.tabla, conn);
 
-    // Limpiar el rastreador de dueños para evitar Use-After-Free
-    pthread_mutex_lock(&mutex_job_owners);
-    JobOwner *prev_o = NULL;
-    JobOwner *curr_o = job_owners;
-    while (curr_o != NULL) {
-        if (curr_o->conn == conn) {
-            JobOwner *to_delete = curr_o;
-            
-            if (prev_o == NULL) {
-                job_owners = curr_o->next;
-                curr_o = job_owners; 
-            } else {
-                prev_o->next = curr_o->next;
-                curr_o = curr_o->next;
-            }
-            free(to_delete);
-        } else {
-            prev_o = curr_o;
-            curr_o = curr_o->next;
-        }
-    }
-    pthread_mutex_unlock(&mutex_job_owners);
-
-    // Limpiar la sala de espera saliente
-    pthread_mutex_lock(&mutex_pendientes_salientes);
-    OutReq *prev_r = NULL;
-    OutReq *curr_r = pendientes_salientes;
-    while (curr_r != NULL) {
-        if (curr_r->conn == conn) {
-            OutReq *next_r = curr_r->next;
-            if (prev_r == NULL) pendientes_salientes = next_r;
-            else prev_r->next = next_r;
-            free(curr_r);
-            curr_r = next_r;
-        } else {
-            prev_r = curr_r;
-            curr_r = curr_r->next;
-        }
-    }
-    pthread_mutex_unlock(&mutex_pendientes_salientes);
-
     // Finalmente, se elimina la conexión de la tabla de nodos conectados
     tabla_conns_delete_by_conn(conn);
     return;
@@ -763,6 +523,7 @@ void process_disconnect(connection_t *conn) {
  * Acá el Gestor de Estado ya puede llamar a enqueue_write con sus peticiones.
  */
 void process_connection_ready(connection_t *conn) {
+    /*
     pthread_mutex_lock(&mutex_pendientes_salientes);
 
     OutReq *prev = NULL;
@@ -788,8 +549,15 @@ void process_connection_ready(connection_t *conn) {
         }
     }
 
+
     pthread_mutex_unlock(&mutex_pendientes_salientes);
     return;
+    */
+
+    /**
+     * TODO: En vez de correr por la lista de OutRequests, hay que ir para cada lista de OutRequests en la TablaJobs
+     * y enviar el mensaje de RESERVE que se quería enviar
+     */
 }
 
 /**
@@ -797,6 +565,7 @@ void process_connection_ready(connection_t *conn) {
  * El Gestor de Estado debe abortar su plan y quizás buscar otro nodo.
  */
 void process_connection_failed(connection_t *conn) {
+    /*
     pthread_mutex_lock(&mutex_pendientes_salientes);
 
     OutReq *prev = NULL;
@@ -835,4 +604,10 @@ void process_connection_failed(connection_t *conn) {
 
     pthread_mutex_unlock(&mutex_pendientes_salientes);
     return;
+    */
+
+    /**
+     * TODO: En vez de recorrer de esta forma, ir por cada bucket en TablaJobs para enviar el JOB_DENIED de
+     * cada uno
+     */
 }
