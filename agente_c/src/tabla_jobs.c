@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include "tabla_jobs.h"
 #include <string.h>
-#include "out_requests.h"
 
 /**
  * ======================================================================================================
@@ -48,6 +47,14 @@ void tabla_jobs_destroy(TablaJobs *j) {
                 curr = n;
             }
 
+            OutRequest *out = job->pendientes;
+            while(out != NULL) {
+                OutRequest *n = out->next;
+                free(out->ip);
+                free(out);
+                out = n;
+            }
+
             free(job);
             job = next;
         }
@@ -55,7 +62,7 @@ void tabla_jobs_destroy(TablaJobs *j) {
         j->tabla_jobs[i] = NULL;
     }
     pthread_mutex_unlock(&j->lock);
-    sem_destroy(&j->lock);
+    pthread_mutex_destroy(&j->lock);
     return;
 }
 
@@ -66,7 +73,7 @@ bool tabla_jobs_get_id(TablaJobs *t, int job_id) {
     Job* curr = t->tabla_jobs[idx];
 
     while (curr != NULL) {
-        if (curr->job_id = job_id) {
+        if (curr->job_id == job_id) {
             pthread_mutex_unlock(&t->lock);
             return true;
         }
@@ -98,7 +105,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount) {
+bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip) {
     pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -111,23 +118,34 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
 
         job->sig = j->tabla_jobs[idx];
         j->tabla_jobs[idx] = job;
-        pthread_mutex_unlock(&j->lock);
-        return true;
     }
 
-    // Sino, crear nuevo Allocation a insertar en el Job buscado
+    // Sino, se busca el Job y se inserta en la lista adecuada
     Job* curr = j->tabla_jobs[idx];
-
     while (curr != NULL) {
         if (curr->job_id == job_id) {
-            // Es una inserción a la cabeza de una lista simplemente enlazada
-            Allocation *all = malloc(sizeof(Allocation));
-            all->amount = amount;
-            all->name = type;
+            // Si viene del agente local, entonces guardar en Allocations
+            if (strcmp(g_ip, ip) == 0) {
+                // Es una inserción a la cabeza de una lista simplemente enlazada
+                Allocation *all = malloc(sizeof(Allocation));
+                all->amount = amount;
+                all->name = type;
 
-            all->sig = curr->confirmadas;
-            curr->confirmadas = all;
-            break;
+                all->sig = curr->confirmadas;
+                curr->confirmadas = all;
+                break;
+            }
+            // Sino, se guarda en OutRequests
+            else {
+                OutRequest *out = malloc(sizeof(OutRequest));
+                out->conn = conn;
+                strncpy(out->ip, ip, sizeof(out->ip)-1);
+                out->ip[sizeof(ip) - 1] = '\0';
+
+                out->next = curr->pendientes;
+                curr->pendientes = out;
+                break;
+            }
         }
         curr = curr->sig;
     }
@@ -184,10 +202,11 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
  * NO se llama con j->lock tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
-void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
+OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     pthread_mutex_lock(&j->lock);
 
     Allocation *allocs_to_release_head = NULL;
+    OutRequest *request_a_liberar = NULL;
 
     for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
         Job *prev = NULL;
@@ -203,13 +222,16 @@ void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
                     prev->sig = next;
                 }
 
-                Allocation *all = curr->allocations;
+                Allocation *all = curr->confirmadas;
                 if (all != NULL) {
                     Allocation *tail = all;
                     while(tail->sig != NULL) tail = tail->sig;
                     tail->sig = allocs_to_release_head;
                     allocs_to_release_head = all;
                 }
+
+                request_a_liberar = curr->pendientes;
+                
                 free(curr);
                 curr = next;
             } else {
@@ -227,7 +249,7 @@ void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
         free(all);
         all = sig;
     }
-    return;
+    return request_a_liberar;
 }
 
 /**

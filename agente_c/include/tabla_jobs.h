@@ -68,7 +68,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip);
 
 /**
  * Avanza con las reservas pendientes en la ColaOutRequests de TablaJobs
