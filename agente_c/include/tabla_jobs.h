@@ -7,48 +7,41 @@
 #include "server.h"
 
 #include <pthread.h>
-#include <semaphore.h>
 
 /**
  * La tabla de Jobs almacena las solicitudes de un Job en una lista de Allocations, con la cantidad acorde a reservar
- * y una lista de solicitudes pendientes de agentes remotos y local
+ * y una lista de OutRequest, solicitudes pendientes de agentes remotos y local
  * La tabla se implementa con una tabla hash, donde cada bucket tiene una lista simplemente enlazada para los 
  * Allocations y una cola hecha con una lista simplemente enlazada para los OutRequests. Usa el mismo job_id como
  * clave de hasheo
  */
 
 typedef struct Allocation {
-    resource_t name;
-    int amount;
-    struct Allocation *sig;
+    resource_t name; // Tipo de recurso
+    int amount; // Cant. reservada
+    struct Allocation *sig; // Siguiente reservación
 } Allocation;
 
 typedef struct OutReq {
-    connection_t *conn;
-    char msg[BUFF_SIZE];
-    char ip[15];
-    struct OutReq *next;
+    char ip[15]; // IP del nodo del cual se solicitó el Job
+    resource_t tipo; // Tipo de recurso
+    int amount; // Cant. a reservar
+    struct OutReq *next; // Siguiente solicitud
 } OutRequest;
 
-typedef struct {
-    OutRequest *head;
-    int cant_requests;
-} ListaOutRequest;
-
 typedef struct Job {
-    int job_id;
-    connection_t *conn;
-    int cant_reserva;
+    int job_id; // ID del Job
+    connection_t *conn; // Conexión que hizo la solicitud
 
-    Allocation *allocations;
+    Allocation *confirmadas; // Recursos con GRANTED hecho
+    OutRequest *pendientes; // Recursos con GRANTED pendiente
 
-    struct Job *sig;
+    struct Job *sig; // Siguiente Job
 } Job;
 
 typedef struct {
-    Job* tabla_jobs[TAM_TABLA_JOBS];
-    ListaOutRequest *pendientes_salientes;
-    sem_t lock;
+    Job* tabla_jobs[TAM_TABLA_JOBS]; // Array de lista de Jobs
+    pthread_mutex_t lock; // Lock para la tabla completa
 } TablaJobs;
 
 /**
@@ -62,10 +55,9 @@ void tabla_jobs_init(TablaJobs *j);
 void tabla_jobs_destroy(TablaJobs *j);
 
 /**
- * ATENCION: Esta función no es thread-safe de por sí. Asume que TablaJobs->mutex esté tomado
- * TODO: Hacer esta función thread-safe
+ * Busca un Job usando su Job ID
  */
-bool buscar_job_tabla(Job *j, int job_id);
+bool tabla_jobs_get_id(TablaJobs *t, int job_id);
 
 /**
  * Busca el conn original asociado a un job_id, sin importar el bucket.

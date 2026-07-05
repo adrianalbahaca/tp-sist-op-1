@@ -4,14 +4,34 @@
 #include <string.h>
 #include "out_requests.h"
 
+/**
+ * ======================================================================================================
+ * Funciones auxiliares
+ * ======================================================================================================
+ */
+
+bool buscar_job_tabla(Job *j, int job_id)
+{
+    Job *curr = j;
+    while (curr != NULL)
+    {
+        if (curr->job_id == job_id)
+            return true;
+        curr = curr->sig;
+    }
+    return false;
+}
+
+// ======================================================================================================
+
 void tabla_jobs_init(TablaJobs *j) {
     memset(j->tabla_jobs, 0, sizeof(j->tabla_jobs));
-    sem_init(&j->lock, 0, 1);
+    pthread_mutex_init(&j->lock, NULL);
     return;
 }
 
 void tabla_jobs_destroy(TablaJobs *j) {
-    sem_wait(&j->lock);
+    pthread_mutex_lock(&j->lock);
     for (int i = 0; i < TAM_TABLA_JOBS; i++) {
         Job* job = j->tabla_jobs[i];
 
@@ -20,7 +40,7 @@ void tabla_jobs_destroy(TablaJobs *j) {
             Job* next =  job->sig;
 
             // Liberar cada allocation
-            Allocation* curr = job->allocations;
+            Allocation* curr = job->confirmadas;
 
             while (curr != NULL) {
                 Allocation* n = curr->sig;
@@ -34,21 +54,25 @@ void tabla_jobs_destroy(TablaJobs *j) {
 
         j->tabla_jobs[i] = NULL;
     }
-    sem_post(&j->lock);
+    pthread_mutex_unlock(&j->lock);
     sem_destroy(&j->lock);
     return;
 }
 
-/**
- * ATENCION: Esta función no es thread-safe de por sí. Asume que TablaJobs->mutex esté tomado
- */
-bool buscar_job_tabla(Job *j, int job_id) {
-    Job *curr = j;
+bool tabla_jobs_get_id(TablaJobs *t, int job_id) {
+    pthread_mutex_lock(&t->lock);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+    
+    Job* curr = t->tabla_jobs[idx];
+
     while (curr != NULL) {
-        if (curr->job_id == job_id)
+        if (curr->job_id = job_id) {
+            pthread_mutex_unlock(&t->lock);
             return true;
+        }
         curr = curr->sig;
     }
+    pthread_mutex_unlock(&t->lock);
     return false;
 }
 
@@ -57,7 +81,7 @@ bool buscar_job_tabla(Job *j, int job_id) {
  * Devuelve NULL si no se encuentra.
  */
 connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
-    sem_wait(&j->lock);
+    pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
     Job *curr = j->tabla_jobs[idx];
 
@@ -65,17 +89,17 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     while (curr != NULL) {
         if (curr->job_id == job_id) {
             connection_t *c = curr->conn;
-            pthread_mutex_unlock(&j->mutex);
+            pthread_mutex_unlock(&j->lock);
             return c;
         }
         curr = curr->sig;
     }
-    sem_post(&j->lock);
+    pthread_mutex_unlock(&j->lock);
     return NULL;
 }
 
 bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount) {
-    sem_wait(&j->lock);
+    pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
     // Si el Job no está allí, se crea un Job nuevo con una lista de Allocations vacía
@@ -83,10 +107,11 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
         Job* job = malloc(sizeof(Job));
         job->conn = conn;
         job->job_id = job_id;
-        job->allocations = NULL;
+        job->confirmadas = NULL;
 
         job->sig = j->tabla_jobs[idx];
         j->tabla_jobs[idx] = job;
+        pthread_mutex_unlock(&j->lock);
         return true;
     }
 
@@ -100,14 +125,13 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             all->amount = amount;
             all->name = type;
 
-            all->sig = curr->allocations;
-            curr->allocations = all;
-            curr->cant_reserva += amount;
+            all->sig = curr->confirmadas;
+            curr->confirmadas = all;
             break;
         }
         curr = curr->sig;
     }
-    sem_post(&j->lock);
+    pthread_mutex_unlock(&j->lock);
     return true;
 }
 
@@ -115,7 +139,7 @@ bool tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
 void tabla_jobs_remove(TablaJobs *j, int job_id) {
-    pthread_mutex_lock(&j->mutex);
+    pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
     Job *prev = NULL;
@@ -133,36 +157,35 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
             }
             
             // Extraer la lista de asignaciones antes de liberar el Job
-            allocs_to_release = start->allocations;
+            allocs_to_release = start->confirmadas;
             free(start);
             break;
         }
         prev = start;
         start = start->sig;
     }
-    // IMPORTANTE: Soltar el lock de la tabla ANTES de invocar a release_resource
-    pthread_mutex_unlock(&j->mutex);
 
     // Iterar y liberar los recursos fuera de la zona crítica de la tabla
     Allocation *all = allocs_to_release;
     while (all != NULL) {
         Allocation *sig = all->sig;
-        // Ahora release_resource (que invoca tabla_jobs_insert) puede tomar el lock de la tabla sin problemas
-        release_resource(all->name, all->amount);
+        release_resource(all->name, all->amount); // Nótese que release_resource nunca usa funciones de la tabla
         free(all);
         all = sig;
     }
+
+    pthread_mutex_unlock(&j->lock);
     return;
 }
 
 /**
  * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos
  * (vía release_resource, que SÍ toma su propio lock) y elimina los jobs.
- * NO se llama con j->mutex tomado, porque release_resource necesita tomar
+ * NO se llama con j->lock tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
 void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
-    pthread_mutex_lock(&j->mutex);
+    pthread_mutex_lock(&j->lock);
 
     Allocation *allocs_to_release_head = NULL;
 
@@ -195,7 +218,7 @@ void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
             }
         }
     }
-    pthread_mutex_unlock(&j->mutex);
+    pthread_mutex_unlock(&j->lock);
 
     Allocation *all = allocs_to_release_head;
     while (all != NULL) {
