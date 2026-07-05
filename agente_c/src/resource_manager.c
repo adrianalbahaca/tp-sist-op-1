@@ -557,6 +557,7 @@ void process_connection_ready(connection_t *conn) {
     /**
      * TODO: En vez de correr por la lista de OutRequests, hay que ir para cada lista de OutRequests en la TablaJobs
      * y enviar el mensaje de RESERVE que se quería enviar
+     * NOTA: Podría simplemente retornar una lista gigante de todos los OutRequests con esta conexión y hacer el envío
      */
 }
 
@@ -609,5 +610,6 @@ void process_connection_failed(connection_t *conn) {
     /**
      * TODO: En vez de recorrer de esta forma, ir por cada bucket en TablaJobs para enviar el JOB_DENIED de
      * cada uno
+     * NOTA: Retornar una lista de todos los OutRequests con esta conexión y enviar el mensaje. Fachilito
      */
 }
