@@ -144,7 +144,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(ip) - 1] = '\0';
                 out->conn = remoto;
-                strncpy(out->msg, buf, sizeof(buf));
+                strncpy(out->msg, buf, sizeof(out->msg));
 
                 out->next = curr->pendientes;
                 curr->pendientes = out;
@@ -209,7 +209,6 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     pthread_mutex_lock(&j->lock);
 
     Allocation *allocs_to_release_head = NULL;
-    OutRequest *request_a_liberar_head = NULL;
 
     for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
         Job *prev = NULL;
@@ -235,7 +234,7 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
 
                 OutRequest *rel = curr->pendientes;
                 if (rel != NULL) {
-                    OutRequest *tail = rel;
+                    OutRequest *tail = rel->next;
                     while (tail->next != NULL) tail = tail->next;
                     free(rel);
                     rel = tail;
