@@ -24,6 +24,8 @@ typedef struct Allocation {
     resource_t name; // Tipo de recurso
     int amount; // Cant. reservada
     alloc_type_t type;
+    char ip[16]; // En caso de ser remoto, IP para enviar mensaje
+    int job_id; // En caso de ser remoto, job_id de cual proviene
     struct Allocation *sig; // Siguiente reservación
 } Allocation;
 
@@ -88,7 +90,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id);
  * NO se llama con j->mutex tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
-void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
+Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
 
 /**
  * Toma la solicitud pendiente con el IP enviado, y lo transfiere a la solicitud confirmada del Job dado
@@ -99,7 +101,9 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id);
 /**
  * Obtener la lista de todos los pendientes en la tabla con esta conexión
  */
-OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn); 
+OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn);
+
+Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 
 /**
  * Declaraciones externas para usar en la librería

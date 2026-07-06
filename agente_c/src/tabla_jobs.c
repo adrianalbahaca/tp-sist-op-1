@@ -140,7 +140,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             // Sino, se guarda en OutRequests
             else {
                 OutRequest *out = malloc(sizeof(OutRequest));
-                out->conn = NULL; // No hay ninguna conexión hecha en el momento. Hay que abrirla después
+                out->conn = remoto;
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(ip) - 1] = '\0';
                 out->conn = remoto;
@@ -205,7 +205,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
  * NO se llama con j->lock tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
-void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
+Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     pthread_mutex_lock(&j->lock);
 
     Allocation *allocs_to_release_head = NULL;
@@ -237,8 +237,8 @@ void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
                 if (rel != NULL) {
                     OutRequest *tail = rel;
                     while (tail->next != NULL) tail = tail->next;
-                    tail->next = request_a_liberar_head;
-                    request_a_liberar_head = rel;
+                    free(rel);
+                    rel = tail;
                 }
                 
                 free(curr);
@@ -251,11 +251,14 @@ void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     }
     pthread_mutex_unlock(&j->lock);
 
-    return request_a_liberar_head;
+    return allocs_to_release_head;
 }
 
 OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) {
-
+    /**
+     * TODO:
+     */
+    return NULL;
 }
 
 /**
@@ -290,12 +293,13 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
             nuevo->amount = sal->amount;
             nuevo->name = sal->tipo;
             nuevo->type = REMOTE;
+            strncpy(nuevo->ip, sal->ip, sizeof(sal->ip) - 1);
+            nuevo->ip[sizeof(sal->ip) - 1] = '\0';
+            nuevo->job_id = job_id;
 
             nuevo->sig = curr->confirmadas;
             curr->confirmadas = nuevo;
 
-            free(sal->ip);
-            free(sal->msg);
             free(sal);
 
             return true;
@@ -304,7 +308,45 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
         prev = sal;
         sal = sal->next;
     }
+    return false;
+}
 
-    if (sal == NULL)
-        return false;
+Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
+    pthread_mutex_lock(&j->lock);
+    
+    Job *extraidos = NULL;  // lista de jobs a retornar
+    
+    for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
+        Job *prev = NULL;
+        Job *curr = j->tabla_jobs[idx];
+        
+        while (curr != NULL) {
+            Job *next = curr->sig;
+            
+            // Chequear si algún OutRequest de este job tiene esa conn
+            bool afectado = false;
+            OutRequest *out = curr->pendientes;
+            while (out != NULL) {
+                if (out->conn == conn) { afectado = true; break; }
+                out = out->next;
+            }
+            
+            if (afectado) {
+                // Desenlazar de la tabla
+                if (prev == NULL) j->tabla_jobs[idx] = next;
+                else prev->sig = next;
+                
+                // Agregar a la lista de extraídos
+                curr->sig = extraidos;
+                extraidos = curr;
+                curr = next;
+            } else {
+                prev = curr;
+                curr = next;
+            }
+        }
+    }
+    
+    pthread_mutex_unlock(&j->lock);
+    return extraidos;
 }
