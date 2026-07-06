@@ -93,6 +93,7 @@ OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
  * Declaraciones externas para usar en la librería
  */
 extern char g_ip[16];
+extern int g_epfd;
 extern void release_resource(resource_t tipo, int amount);
 
 #endif

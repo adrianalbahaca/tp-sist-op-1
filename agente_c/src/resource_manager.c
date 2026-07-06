@@ -275,6 +275,7 @@ void process_message(connection_t *conn, char *msg) {
              * Se procesa el pendiente con el job_id dado
              * Si la lista de pendientes a procesar se vacía, avisar con algún indicador y enviar un JOB_GRANTED a conn
              */
+
         } else {
             fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
         }
@@ -337,8 +338,9 @@ void process_message(connection_t *conn, char *msg) {
                     snprintf(buf, sizeof(buf),  "JOB_DENIED %d\n", result.job_id);
                     printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
                     enqueue_write(g_epfd, conn, buf);
+                    return;
                 }
-                else if (r == RM_GRANTED) {
+                else if (r == RM_GRANTED || r == RM_QUEUED) {
                     tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip);
                 }
             }
@@ -353,10 +355,55 @@ void process_message(connection_t *conn, char *msg) {
         while (curr != NULL) {
             char buf[BUFF_SIZE];
             if (strcmp(curr->ip, g_ip) != 0) {
-                // Insertar en la tabla, sabiendo que están pendientes
-                snprintf(buf, sizeof(buf), "RESERVE %d %s %d\n", result.job_id, recurso_type_a_string(curr->type), curr->amount);
-                enqueue_write(g_epfd, conn, buf);
-                tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip);
+                connection_t *remote = tabla_conns_lookup(curr->ip);
+
+                if (remote != NULL) {
+                    char msg[BUFF_SIZE];
+                    snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
+                    enqueue_write(g_epfd, remote, msg);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip);
+                }
+                else {
+                    /**
+                     * Iniciar o conectar con conexión asíncrona
+                     */
+                    int puerto = tabla_nodos_get_puerto(curr->ip);
+                    connection_t *n = NULL;
+
+                    if (puerto != -1) n = connect_remote_node(g_epfd, curr->ip, puerto);
+
+                    if (n == NULL) {
+                        pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+                        queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
+                        pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+                        pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+                        queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
+                        pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+                        pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+                        queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
+                        pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+                        tabla_jobs_remove(&manager.tabla, result.job_id);
+
+                        /**
+                         * TODO: Enviar un mensaje de DENIED a quien hizo este request
+                         */
+                        char buf[BUFF_SIZE];
+                        snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
+                        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
+                        enqueue_write(g_epfd, conn, buf);
+                        return;
+                    }
+                    else {
+                        // Enviar mensaje de solicitud de RESERVE adecuado
+                        char buf[BUFF_SIZE];
+                        snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
+                        enqueue_write(g_epfd, n, msg);
+                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip);
+                    }
+                }
             }
             curr = curr->next;
         }

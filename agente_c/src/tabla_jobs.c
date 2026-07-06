@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "tabla_jobs.h"
 #include <string.h>
+#include <stdio.h>
 
 /**
  * ======================================================================================================
@@ -138,7 +139,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             // Sino, se guarda en OutRequests
             else {
                 OutRequest *out = malloc(sizeof(OutRequest));
-                out->conn = conn;
+                out->conn = NULL; // No hay ninguna conexión hecha en el momento. Hay que abrirla después
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(ip) - 1] = '\0';
 
@@ -257,6 +258,39 @@ OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
 void avanzar_reserva(TablaJobs *j, int job_id) {
     /**
      * TODO: Completar esta función considerando que el OutRequest estará dentro de TablaJobs
-     * 
      */
+
+    pthread_mutex_lock(&j->lock);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+
+    // Buscar el Job correcto
+    Job* curr = j->tabla_jobs[idx];
+
+    while (curr != NULL) {
+        if (curr->job_id == job_id) break;
+        curr = curr->sig;
+    }
+
+    if (curr == NULL) {
+        // El Job no existe en la tabla. Se ignora y retorna
+        printf("[AVANZAR_RESERVA] Job %d: NO se encuentra en la tabla!!\n", job_id);
+        pthread_mutex_unlock(&j->lock);
+        return;
+    }
+
+    if (curr->pendientes == NULL) {
+        // Si no hay más pendientes, entonces se puede enviar el JOB_GRANTED sin problemas
+        connection_t *erlang = curr->conn;
+
+        char msg[BUFF_SIZE];
+        snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", curr->job_id);
+        enqueue_write(g_epfd, curr->conn, msg);
+        
+        /**
+         * TODO: Eliminar este Job de la tabla
+         */
+    }
+
+    
+    pthread_mutex_unlock(&j->lock);
 }
