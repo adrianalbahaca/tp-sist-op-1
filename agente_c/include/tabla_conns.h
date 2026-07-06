@@ -30,6 +30,8 @@ void tabla_conns_delete(char ip[]);
 
 void tabla_conns_delete_by_conn(connection_t *conn);
 
+const char* tabla_conns_get_ip_by_conn(connection_t *conn);
+
 void tabla_conns_destroy();
 
 #endif

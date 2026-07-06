@@ -60,6 +60,24 @@ connection_t* tabla_conns_lookup(char ip[]) {
     return NULL;
 }
 
+const char* tabla_conns_get_ip_by_conn(connection_t *conn) {
+    pthread_mutex_lock(&tabla_conns.mutex);
+
+    for (int i = 0; i < TAM_TABLA_CONN; i++) {
+        ConnEntry *c = tabla_conns.buckets[i];
+        while (c != NULL) {
+            if (c->conn == conn) {
+                pthread_mutex_unlock(&tabla_conns.mutex);
+                return c->ip;
+            }
+            c = c->next;
+        }
+    }
+
+    pthread_mutex_unlock(&tabla_conns.mutex);
+    return NULL;
+}
+
 void tabla_conns_delete(char ip[]) {
     printf("[LOCK] intentando tomar tabla_conns.mutex en DELETE (ip=%s)\n", ip); fflush(stdout);
     pthread_mutex_lock(&tabla_conns.mutex);

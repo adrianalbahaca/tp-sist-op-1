@@ -71,13 +71,7 @@ void manager_set_ip(const char *ip) {
     return;
 }
 
-/**
- * =====================================================================================
- * Funciones Auxiliares de la TablaJobs
- * =====================================================================================
- */
-
-/**
+ /**
  * =====================================================================================
  * Funciones de Recurso
  * =====================================================================================
@@ -275,6 +269,31 @@ void process_message(connection_t *conn, char *msg) {
              * Se procesa el pendiente con el job_id dado
              * Si la lista de pendientes a procesar se vacía, avisar con algún indicador y enviar un JOB_GRANTED a conn
              */
+            const char *ip_remoto = tabla_conns_get_ip_by_conn(conn);
+            if (ip_remoto == NULL) {
+                fprintf(stderr, "GRANTED de una conexión desconocida\n");
+            }
+            pthread_mutex_lock(&manager.tabla.lock);
+            bool confirmado = tabla_jobs_confirmar(&manager.tabla, ip_remoto, result.job_id);
+
+            if (confirmado) {
+                Job *j = result.job_id % TAM_TABLA_JOBS;
+                while (j != NULL) {
+                    if (j->job_id == result.job_id) break;
+                    j = j->sig;
+                }
+
+                if (j != NULL && j->pendientes == NULL) {
+                    char buf[BUFF_SIZE];
+                    snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+                    printf("[TX] A ERLANG LOCAL (fd %d) -> %s", j->conn->fd, buf);
+                    enqueue_write(g_epfd, j->conn, buf);
+                }
+            }
+            else {
+
+            }
+            pthread_mutex_unlock(&manager.tabla.lock);
 
         } else {
             fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
@@ -286,7 +305,7 @@ void process_message(connection_t *conn, char *msg) {
     else if (strncmp(msg, "DENIED", 6) == 0) {
         denied_msg_t result = parse_denied(msg);
         if (result.valido) {
-            connection_t *owner = buscar_job_owner(result.job_id);
+            connection_t *owner = tabla_jobs_get_conn(&manager.tabla ,result.job_id);
             if (owner != NULL) {
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
@@ -341,7 +360,7 @@ void process_message(connection_t *conn, char *msg) {
                     return;
                 }
                 else if (r == RM_GRANTED || r == RM_QUEUED) {
-                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip, NULL, NULL);
                 }
             }
 
@@ -361,7 +380,7 @@ void process_message(connection_t *conn, char *msg) {
                     char msg[BUFF_SIZE];
                     snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
                     enqueue_write(g_epfd, remote, msg);
-                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL);
                 }
                 else {
                     /**
@@ -400,8 +419,7 @@ void process_message(connection_t *conn, char *msg) {
                         // Enviar mensaje de solicitud de RESERVE adecuado
                         char buf[BUFF_SIZE];
                         snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
-                        enqueue_write(g_epfd, n, msg);
-                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip);
+                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, n, buf);
                     }
                 }
             }
@@ -606,6 +624,12 @@ void process_connection_ready(connection_t *conn) {
      * y enviar el mensaje de RESERVE que se quería enviar
      * NOTA: Podría simplemente retornar una lista gigante de todos los OutRequests con esta conexión y hacer el envío
      */
+    OutRequest *lista = tabla_jobs_by_conn(&manager.tabla ,conn);
+    while (lista != NULL) {
+        enqueue_write(g_epfd, conn, lista->msg);
+        lista = lista->next;
+    }
+    return;
 }
 
 /**
@@ -659,4 +683,9 @@ void process_connection_failed(connection_t *conn) {
      * cada uno
      * NOTA: Retornar una lista de todos los OutRequests con esta conexión y enviar el mensaje. Fachilito
      */
+    pthread_mutex_lock(&manager.tabla.lock);
+
+    
+
+    pthread_mutex_unlock(&manager.tabla.lock);
 }

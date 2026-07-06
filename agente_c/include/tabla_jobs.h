@@ -8,6 +8,11 @@
 
 #include <pthread.h>
 
+typedef enum {
+    REMOTE,
+    LOCAL
+} alloc_type_t;
+
 /**
  * La tabla de Jobs almacena las solicitudes de un Job en una lista de Allocations, con la cantidad acorde a reservar
  * y una lista de OutRequest, solicitudes pendientes de agentes remotos y local
@@ -15,18 +20,19 @@
  * Allocations y una cola hecha con una lista simplemente enlazada para los OutRequests. Usa el mismo job_id como
  * clave de hasheo
  */
-
 typedef struct Allocation {
     resource_t name; // Tipo de recurso
     int amount; // Cant. reservada
+    alloc_type_t type;
     struct Allocation *sig; // Siguiente reservación
 } Allocation;
 
 typedef struct OutReq {
-    char ip[15]; // IP del nodo del cual se solicitó el Job
+    char ip[15]; // IP del nodo remoto a solicitar el Job
     connection_t *conn; // Conexión proveniente de la solicitud del Job
     resource_t tipo; // Tipo de recurso
     int amount; // Cant. a reservar
+    char msg[BUFF_SIZE]; // Mensaje a enviar una vez se haga la conexión remota
     struct OutReq *next; // Siguiente solicitud
 } OutRequest;
 
@@ -69,12 +75,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip);
-
-/**
- * Avanza con las reservas pendientes en la ColaOutRequests de TablaJobs
- */
-void avanzar_reserva(TablaJobs *j, int job_id);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, const char *msg);
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
@@ -87,7 +88,18 @@ void tabla_jobs_remove(TablaJobs *j, int job_id);
  * NO se llama con j->mutex tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
-OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
+void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
+
+/**
+ * Toma la solicitud pendiente con el IP enviado, y lo transfiere a la solicitud confirmada del Job dado
+ * CUIDADO: Esta función no es thread-safe. Asume que se ha tomado tabla->lock antes de entrar acá
+ */
+bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id);
+
+/**
+ * Obtener la lista de todos los pendientes en la tabla con esta conexión
+ */
+OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn); 
 
 /**
  * Declaraciones externas para usar en la librería

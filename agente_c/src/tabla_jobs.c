@@ -106,7 +106,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip) {
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, const char *buf) {
     pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -131,6 +131,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 Allocation *all = malloc(sizeof(Allocation));
                 all->amount = amount;
                 all->name = type;
+                all->type = LOCAL;
 
                 all->sig = curr->confirmadas;
                 curr->confirmadas = all;
@@ -142,6 +143,8 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 out->conn = NULL; // No hay ninguna conexión hecha en el momento. Hay que abrirla después
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(ip) - 1] = '\0';
+                out->conn = remoto;
+                strncpy(out->msg, buf, sizeof(buf));
 
                 out->next = curr->pendientes;
                 curr->pendientes = out;
@@ -202,11 +205,11 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
  * NO se llama con j->lock tomado, porque release_resource necesita tomar
  * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
  */
-OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
+void tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     pthread_mutex_lock(&j->lock);
 
     Allocation *allocs_to_release_head = NULL;
-    OutRequest *request_a_liberar = NULL;
+    OutRequest *request_a_liberar_head = NULL;
 
     for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
         Job *prev = NULL;
@@ -230,7 +233,13 @@ OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
                     allocs_to_release_head = all;
                 }
 
-                request_a_liberar = curr->pendientes;
+                OutRequest *rel = curr->pendientes;
+                if (rel != NULL) {
+                    OutRequest *tail = rel;
+                    while (tail->next != NULL) tail = tail->next;
+                    tail->next = request_a_liberar_head;
+                    request_a_liberar_head = rel;
+                }
                 
                 free(curr);
                 curr = next;
@@ -242,55 +251,60 @@ OutRequest* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     }
     pthread_mutex_unlock(&j->lock);
 
-    Allocation *all = allocs_to_release_head;
-    while (all != NULL) {
-        Allocation *sig = all->sig;
-        release_resource(all->name, all->amount);
-        free(all);
-        all = sig;
-    }
-    return request_a_liberar;
+    return request_a_liberar_head;
+}
+
+OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) {
+
 }
 
 /**
- * Avanza con las reservas pendientes en la ColaOutRequests de TablaJobs
+ * Toma la solicitud pendiente con el IP enviado, y lo transfiere a la solicitud confirmada del Job dado
+ * CUIDADO: Esta función no es thread-safe. Asume que se ha tomado tabla->lock antes de entrar acá
  */
-void avanzar_reserva(TablaJobs *j, int job_id) {
-    /**
-     * TODO: Completar esta función considerando que el OutRequest estará dentro de TablaJobs
-     */
-
-    pthread_mutex_lock(&j->lock);
+bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
-    // Buscar el Job correcto
     Job* curr = j->tabla_jobs[idx];
-
     while (curr != NULL) {
         if (curr->job_id == job_id) break;
         curr = curr->sig;
     }
 
-    if (curr == NULL) {
-        // El Job no existe en la tabla. Se ignora y retorna
-        printf("[AVANZAR_RESERVA] Job %d: NO se encuentra en la tabla!!\n", job_id);
-        pthread_mutex_unlock(&j->lock);
-        return;
+    if (curr == NULL)
+        return false;
+
+    // Buscar el saliente con la dirección IP dada
+    OutRequest *sal = curr->pendientes;
+    OutRequest *prev = NULL;
+
+    while (sal != NULL) {
+        if (strcmp(sal->ip, ip) == 0) {
+            if (prev == NULL)
+                curr->pendientes = sal->next;
+            else
+                prev->next = sal->next;
+            
+            // Crear nuevo Allocation
+            Allocation *nuevo = malloc(sizeof(Allocation));
+            nuevo->amount = sal->amount;
+            nuevo->name = sal->tipo;
+            nuevo->type = REMOTE;
+
+            nuevo->sig = curr->confirmadas;
+            curr->confirmadas = nuevo;
+
+            free(sal->ip);
+            free(sal->msg);
+            free(sal);
+
+            return true;
+
+        }
+        prev = sal;
+        sal = sal->next;
     }
 
-    if (curr->pendientes == NULL) {
-        // Si no hay más pendientes, entonces se puede enviar el JOB_GRANTED sin problemas
-        connection_t *erlang = curr->conn;
-
-        char msg[BUFF_SIZE];
-        snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", curr->job_id);
-        enqueue_write(g_epfd, curr->conn, msg);
-        
-        /**
-         * TODO: Eliminar este Job de la tabla
-         */
-    }
-
-    
-    pthread_mutex_unlock(&j->lock);
+    if (sal == NULL)
+        return false;
 }
