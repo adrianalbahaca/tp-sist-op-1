@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "tabla_jobs.h"
+#include "tabla_conns.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -51,7 +52,6 @@ void tabla_jobs_destroy(TablaJobs *j) {
             OutRequest *out = job->pendientes;
             while(out != NULL) {
                 OutRequest *n = out->next;
-                free(out->ip);
                 free(out);
                 out = n;
             }
@@ -142,9 +142,10 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 OutRequest *out = malloc(sizeof(OutRequest));
                 out->conn = remoto;
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
-                out->ip[sizeof(ip) - 1] = '\0';
+                out->ip[sizeof(out->ip) - 1] = '\0';
                 out->conn = remoto;
-                strncpy(out->msg, buf, sizeof(out->msg));
+                strncpy(out->msg, buf, sizeof(out->msg)-1);
+                out->msg[sizeof(out->msg) - 1] = '\0';
 
                 out->next = curr->pendientes;
                 curr->pendientes = out;
@@ -167,6 +168,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
     Job *start = j->tabla_jobs[idx];
 
     Allocation *allocs_to_release = NULL;
+    OutRequest *outreq_to_release = NULL;
 
     while (start != NULL) {
         if (start->job_id == job_id) {
@@ -179,6 +181,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
             
             // Extraer la lista de asignaciones antes de liberar el Job
             allocs_to_release = start->confirmadas;
+            outreq_to_release = start->pendientes;
             free(start);
             break;
         }
@@ -188,11 +191,28 @@ void tabla_jobs_remove(TablaJobs *j, int job_id) {
 
     // Iterar y liberar los recursos fuera de la zona crítica de la tabla
     Allocation *all = allocs_to_release;
+    char buf[BUFF_SIZE];
     while (all != NULL) {
         Allocation *sig = all->sig;
-        release_resource(all->name, all->amount); // Nótese que release_resource nunca usa funciones de la tabla
+        if (all->type == LOCAL)
+            release_resource(all->name, all->type);
+        else if (all == REMOTE) {
+            connection_t *remote = tabla_conns_lookup(all->ip);
+            if (remote != NULL) {
+                snprintf(buf, sizeof(buf), "RELEASE %d\n", job_id);
+                enqueue_write(g_epfd, remote, buf);
+            }      
+        }
         free(all);
         all = sig;
+    }
+
+    // Del resto, simplemente libero la lista de OutRequests que no fueron satisfechos
+    OutRequest *req = outreq_to_release;
+    while (req != NULL) {
+        OutRequest *sig = req->next;
+        free(req);
+        req = sig;
     }
 
     pthread_mutex_unlock(&j->lock);
@@ -235,7 +255,6 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
                 OutRequest *rel = curr->pendientes;
                 if (rel != NULL) {
                     OutRequest *tail = rel->next;
-                    while (tail->next != NULL) tail = tail->next;
                     free(rel);
                     rel = tail;
                 }
@@ -254,10 +273,41 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
 }
 
 OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) {
-    /**
-     * TODO:
-     */
-    return NULL;
+    OutRequest *lista = NULL;
+    pthread_mutex_lock(&j->lock);
+    for (int i = 0; i < TAM_TABLA_JOBS; i++) {
+        Job *job = j->tabla_jobs[i];
+
+        while (job != NULL) {
+            if (job->conn == conn) {
+                /**
+                 * TODO: Hacer una copia de todos los OutRequests que tiene este elemento
+                 */
+                OutRequest *req = job->pendientes;
+                while (req != NULL) {
+                   OutRequest *nuevo = malloc(sizeof(OutRequest));
+                   nuevo->amount = req->amount;
+                   nuevo->conn = req->conn;
+                   strncpy(nuevo->ip, req->ip, sizeof(nuevo->ip) - 1);
+                   nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
+                   strncpy(nuevo->msg, req->msg, sizeof(nuevo->msg) - 1);
+                   nuevo->msg[sizeof(nuevo->msg) - 1] = '\0';
+                   nuevo->tipo = req->tipo;
+
+                   if (lista != NULL) {
+                    nuevo->next = lista;
+                   }
+
+                   lista = nuevo;
+
+                   req = req->next;
+                }
+            }
+            job = job->sig;
+        }
+    }
+    pthread_mutex_unlock(&j->lock);
+    return lista;
 }
 
 /**

@@ -55,9 +55,14 @@ static char* recurso_type_a_string(resource_t type) {
 static ResourceManager manager;
 
 /**
+ * La tabla de conexiones se declara de forma estática acá
+ */
+static TablaConns conns;
+
+/**
  * Se ajusta el epoll local para que lo use el manager
  */
-static int g_epfd;
+int g_epfd;
 
 void manager_set_epoll(int epfd) {
     g_epfd = epfd;
@@ -106,7 +111,7 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
 }
 
 // Atiende una orden RELEASE, liberando la memoria y la cola acorde
-static void release_resource(resource_t tipo, int amount) {
+void release_resource(resource_t tipo, int amount) {
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
     manager.recursos[tipo].available_amount += amount;
 
@@ -151,7 +156,7 @@ void manager_init(int cpu, int mem, int gpu) {
     manager.recursos[RESOURCE_GPU].available_amount = manager.recursos[RESOURCE_GPU].total_amount = gpu;
     
     tabla_jobs_init(&manager.tabla);
-    tabla_conns_init();
+    tabla_conns_init(&conns);
     tabla_nodos_init();
 
     queue_init(&manager.recursos[RESOURCE_CPU].cola);
@@ -181,7 +186,7 @@ void manager_destroy() {
     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
     tabla_jobs_destroy(&manager.tabla);
-    tabla_conns_destroy();
+    tabla_conns_destroy(&conns);
     tabla_nodos_destroy();
 
     pthread_mutex_destroy(&manager.recursos[RESOURCE_CPU].mutex);
@@ -265,7 +270,7 @@ void process_message(connection_t *conn, char *msg) {
              * Se procesa el pendiente con el job_id dado
              * Si la lista de pendientes a procesar se vacía, avisar con algún indicador y enviar un JOB_GRANTED a conn
              */
-            const char *ip_remoto = tabla_conns_get_ip_by_conn(conn);
+            const char *ip_remoto = tabla_conns_get_ip_by_conn(&conns, conn);
             if (ip_remoto == NULL) {
                 fprintf(stderr, "GRANTED de una conexión desconocida\n");
             }
@@ -370,7 +375,7 @@ void process_message(connection_t *conn, char *msg) {
         curr = result.request_list;
         while (curr != NULL) {
             if (strcmp(curr->ip, g_ip) != 0) {
-                connection_t *remote = tabla_conns_lookup(curr->ip);
+                connection_t *remote = tabla_conns_lookup(&conns, curr->ip);
 
                 if (remote != NULL) {
                     char msg[BUFF_SIZE];
@@ -475,17 +480,17 @@ void process_message(connection_t *conn, char *msg) {
                      result.job_id, result.job_id, result.job_id);
 
             printf("[LOCK] intentando tomar tabla_conns.mutex en BROADCAST (JOB_RELEASE)\n"); fflush(stdout);
-            pthread_mutex_lock(&tabla_conns.mutex);
+            pthread_mutex_lock(&conns.mutex);
             printf("[LOCK] tomado tabla_conns.mutex en BROADCAST\n"); fflush(stdout);
             for (int i = 0; i < TAM_TABLA_CONN; i++) {
-                ConnEntry *curr = tabla_conns.buckets[i];
+                ConnEntry *curr = conns.buckets[i];
                 while (curr != NULL) {
                     printf("[TX] BROADCAST INTERNO A AGENTE %s (fd %d) -> %s", curr->ip, curr->conn->fd, buf);
                     enqueue_write(g_epfd, curr->conn, buf);
                     curr = curr->next;
                 }
             }
-            pthread_mutex_unlock(&tabla_conns.mutex);
+            pthread_mutex_unlock(&conns.mutex);
 
             tabla_jobs_remove(&manager.tabla, result.job_id);
 
@@ -578,7 +583,7 @@ void process_disconnect(connection_t *conn) {
         Allocation* n = lista->sig;
 
         if (lista->type == REMOTE) {
-            connection_t *remote = tabla_conns_lookup(lista->ip);
+            connection_t *remote = tabla_conns_lookup(&conns, lista->ip);
             if (remote != NULL) {
                 snprintf(buf, sizeof(buf), "RELEASE %d\n", lista->job_id);
                 enqueue_write(g_epfd, remote, buf);
@@ -589,7 +594,7 @@ void process_disconnect(connection_t *conn) {
     }
 
     // Finalmente, se elimina la conexión de la tabla de nodos conectados
-    tabla_conns_delete_by_conn(conn);
+    tabla_conns_delete_by_conn(&conns, conn);
     return;
 }
 
@@ -639,6 +644,13 @@ void process_connection_ready(connection_t *conn) {
     while (lista != NULL) {
         enqueue_write(g_epfd, conn, lista->msg);
         lista = lista->next;
+    }
+
+    // Eliminar toda esta lista
+    while (lista != NULL) {
+        OutRequest *next = lista->next;
+        free(lista);
+        lista = next;
     }
     return;
 }
@@ -718,7 +730,7 @@ void process_connection_failed(connection_t *conn) {
             if (all->type == LOCAL)
                 release_resource(all->name, lista->job_id);
             else if(all->type == REMOTE) {
-                connection_t *remote = tabla_conns_lookup(all->ip);
+                connection_t *remote = tabla_conns_lookup(&conns, all->ip);
                 if (remote != NULL) {
                     char buf[BUFF_SIZE];
                     snprintf(buf, sizeof(buf), "RELEASE %d\n", lista->job_id);

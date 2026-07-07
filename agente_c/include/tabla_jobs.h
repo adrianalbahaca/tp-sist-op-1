@@ -5,6 +5,7 @@
 
 #include "resource_types.h"
 #include "server.h"
+#include "tabla_conns.h"
 
 #include <pthread.h>
 

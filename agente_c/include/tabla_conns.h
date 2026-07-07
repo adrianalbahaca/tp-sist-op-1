@@ -18,20 +18,18 @@ typedef struct {
     pthread_mutex_t mutex;
 } TablaConns;
 
-static TablaConns tabla_conns;
+void tabla_conns_init(TablaConns *t);
 
-void tabla_conns_init();
+void tabla_conns_insert(TablaConns *t, char ip[], connection_t *conn);
 
-void tabla_conns_insert(char ip[], connection_t *conn);
+connection_t* tabla_conns_lookup(TablaConns *t, const char ip[]);
 
-connection_t* tabla_conns_lookup(char ip[]);
+void tabla_conns_delete(TablaConns *t, char ip[]);
 
-void tabla_conns_delete(char ip[]);
+void tabla_conns_delete_by_conn(TablaConns *t, connection_t *conn);
 
-void tabla_conns_delete_by_conn(connection_t *conn);
+const char* tabla_conns_get_ip_by_conn(TablaConns *t, connection_t *conn);
 
-const char* tabla_conns_get_ip_by_conn(connection_t *conn);
-
-void tabla_conns_destroy();
+void tabla_conns_destroy(TablaConns *t);
 
 #endif
