@@ -83,7 +83,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
-void tabla_jobs_remove(TablaJobs *j, int job_id);
+void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns);
 
 /**
  * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos

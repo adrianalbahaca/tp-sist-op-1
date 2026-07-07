@@ -33,7 +33,7 @@ typedef struct {
     TablaJobs tabla;
 } ResourceManager;
 
-static char* recurso_type_a_string(resource_t type) {
+static char* resource_type_to_str(resource_t type) {
     switch(type) {
         case RESOURCE_CPU:
             return "cpu";
@@ -45,6 +45,7 @@ static char* recurso_type_a_string(resource_t type) {
             return "gpu";
             break;
         default:
+            return NULL;
             break;
     }
 }
@@ -81,12 +82,6 @@ void manager_set_ip(const char *ip) {
  * Funciones de Recurso
  * =====================================================================================
  */
-
-static const char* resource_type_to_str(resource_t tipo) {
-    if (tipo == RESOURCE_CPU) return "cpu";
-    if (tipo == RESOURCE_MEM) return "mem";
-    return "gpu";
-}
 
 // Atiende una orden RESERVE y devuelve una respuesta acorde
 static result_t reserve_resource (resource_t tipo, int amount, int job_id, connection_t *conn) {
@@ -240,7 +235,7 @@ void process_message(connection_t *conn, char *msg) {
 
         if (result.valido) {
             release_resource(result.type, result.amount);
-            tabla_jobs_remove(&manager.tabla, result.job_id);
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns);
 
             // PURGA DE FANTASMAS
             pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -266,7 +261,6 @@ void process_message(connection_t *conn, char *msg) {
         granted_msg_t result = parse_granted(msg);
         if (result.valido) {
             /**
-             * TODO: Manejar el caso de un GRANTED adecuadamente
              * Se procesa el pendiente con el job_id dado
              * Si la lista de pendientes a procesar se vacía, avisar con algún indicador y enviar un JOB_GRANTED a conn
              */
@@ -350,7 +344,7 @@ void process_message(connection_t *conn, char *msg) {
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-                    tabla_jobs_remove(&manager.tabla, result.job_id);
+                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns);
 
                     /**
                      * TODO: Enviar un mensaje de DENIED a quien hizo este request
@@ -405,7 +399,7 @@ void process_message(connection_t *conn, char *msg) {
                         queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                         pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-                        tabla_jobs_remove(&manager.tabla, result.job_id);
+                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns);
 
                         char buf[BUFF_SIZE];
                         snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
@@ -492,7 +486,7 @@ void process_message(connection_t *conn, char *msg) {
             }
             pthread_mutex_unlock(&conns.mutex);
 
-            tabla_jobs_remove(&manager.tabla, result.job_id);
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns);
 
             // PURGA DE FANTASMAS
             pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -529,6 +523,48 @@ void process_message(connection_t *conn, char *msg) {
         }
         else {
             fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
+        }
+    
+    }
+    else if (strncmp(msg, "JOB_DENIED", 10) == 0) {
+        job_denied_msg_t result = parse_job_denied(msg);
+        
+        if (result.valido) {
+            /**
+             * TODO: Elimnar todos los Jobs adecuados
+             */
+            pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns);
+        }
+    }
+    else if (strncmp(msg, "JOB_TIMEOUT", 11) == 0) {
+        job_timeout_msg_t result = parse_job_timeout(msg);
+
+        if (result.valido) {
+            pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+            pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+            queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
+            pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns);
         }
     }
     /**
@@ -713,15 +749,15 @@ void process_connection_failed(connection_t *conn) {
         Job *sig = lista->sig;
 
         pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
-        queue_delete_by_conn(&manager.recursos[RESOURCE_CPU].cola, conn);
+        queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, lista->job_id);
         pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
 
         pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
-        queue_delete_by_conn(&manager.recursos[RESOURCE_MEM].cola, conn);
+        queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, lista->job_id);
         pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
 
         pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
-        queue_delete_by_conn(&manager.recursos[RESOURCE_GPU].cola, conn);
+        queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, lista->job_id);
         pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
         Allocation *all = lista->confirmadas;
@@ -739,11 +775,7 @@ void process_connection_failed(connection_t *conn) {
             }
             free(all);
             all = n;
-        }  
-        
-        char neg[BUFF_SIZE];
-        snprintf(neg, sizeof(neg), "JOB_DENIED %d\n", lista->job_id);
-        enqueue_write(g_epfd, lista->conn, neg);
+        }
 
         OutRequest *sal = lista->pendientes;
         while (sal != NULL) {

@@ -231,6 +231,34 @@ job_status_msg_t parse_job_status(const char* msg) {
     return result;
 }
 
+job_denied_msg_t parse_job_denied(const char* msg) {
+    job_denied_msg_t result;
+    result.valido = false;
+
+    int job_id;
+    if (sscanf(msg, "JOB_DENIED %d", &job_id) != 1) {
+        return result;
+    }
+
+    result.job_id = job_id;
+    result.valido = true;
+    return result;
+}
+
+job_timeout_msg_t parse_job_timeout(const char* msg) {
+    job_timeout_msg_t result;
+    result.valido = false;
+
+    int job_id;
+    if(sscanf(msg, "JOB_TIMEOUT %d", &job_id) != 1) {
+        return result;
+    }
+
+    result.job_id = job_id;
+    result.valido = true;
+    return result;
+}
+
 /**
  * Este es el parseo del comando ANNOUNCE
  * Este código permite recibir un ANNOUNCE cualquiera sin importar el orden de los recursos que recibe

@@ -42,6 +42,10 @@ typedef struct {
 
 typedef granted_msg_t denied_msg_t;
 
+typedef granted_msg_t job_denied_msg_t;
+
+typedef granted_msg_t job_timeout_msg_t;
+
 /**
  * Para los comandos como JOB_RELEASE, que se tienen que parsear, se crean sus mensajes acordes
  */
@@ -76,6 +80,10 @@ void resource_list_destroy(resource_request_t *list);
 job_release_msg_t parse_job_release(const char* msg);
 
 job_status_msg_t parse_job_status(const char* msg);
+
+job_denied_msg_t parse_job_denied(const char* msg);
+
+job_timeout_msg_t parse_job_timeout(const char* msg);
 
 announce_msg_t parse_announce(const char* msg);
 
