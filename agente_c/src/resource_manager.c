@@ -678,12 +678,8 @@ void process_connection_ready(connection_t *conn) {
     OutRequest* lista = tabla_jobs_get_pendientes_by_conn(&manager.tabla, conn);
 
     while (lista != NULL) {
+        tabla_conns_insert(&conns, lista->ip, conn);
         enqueue_write(g_epfd, conn, lista->msg);
-        lista = lista->next;
-    }
-
-    // Eliminar toda esta lista
-    while (lista != NULL) {
         OutRequest *next = lista->next;
         free(lista);
         lista = next;
@@ -742,8 +738,6 @@ void process_connection_failed(connection_t *conn) {
      * cada uno
      * NOTA: Retornar una lista de todos los OutRequests con esta conexión y enviar el mensaje. Fachilito
      */
-    pthread_mutex_lock(&manager.tabla.lock);
-
     Job* lista =  tabla_jobs_extract_by_remote_conn(&manager.tabla, conn);
     while (lista != NULL) {
         Job *sig = lista->sig;
@@ -764,12 +758,12 @@ void process_connection_failed(connection_t *conn) {
         while (all != NULL) {
             Allocation *n = all->sig;
             if (all->type == LOCAL)
-                release_resource(all->name, lista->job_id);
+                release_resource(all->name, all->amount);
             else if(all->type == REMOTE) {
                 connection_t *remote = tabla_conns_lookup(&conns, all->ip);
                 if (remote != NULL) {
                     char buf[BUFF_SIZE];
-                    snprintf(buf, sizeof(buf), "RELEASE %d\n", lista->job_id);
+                    snprintf(buf, sizeof(buf), "RELEASE %d %s %d\n", lista->job_id, resource_type_to_str(all->name), all->amount);
                     enqueue_write(g_epfd, remote, buf);
                 }
             }
@@ -787,6 +781,4 @@ void process_connection_failed(connection_t *conn) {
         free(lista);
         lista = sig;
     }
-
-    pthread_mutex_unlock(&manager.tabla.lock);
 }

@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include "server.h"
 
+/**
+ * La Cola de Requests Pendientes será una lista simplemente enlazada con punteros a su tope y fondo
+ */
 typedef struct PendingRequest{
     int job_id;
     int amount;
@@ -46,13 +49,13 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id);
 /**
  * Encola un elemento si es que no supera la cantidad máxima de recurso enviado, aumentando su contador de recurso
  * a solicitar
- * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
+ * ADVERTENCIA: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
  */
 bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount);
 
 /**
  * Desencola un elemento y reduce su contador de recurso a utilizar
- * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
+ * ADVERTENCIA: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
  */
 PendingRequest* queue_dequeue(ColaPendingRequest *c);
 

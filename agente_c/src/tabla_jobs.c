@@ -23,6 +23,25 @@ bool buscar_job_tabla(Job *j, int job_id)
     return false;
 }
 
+static char *resource_type_to_str(resource_t type)
+{
+    switch (type)
+    {
+    case RESOURCE_CPU:
+        return "cpu";
+        break;
+    case RESOURCE_MEM:
+        return "mem";
+        break;
+    case RESOURCE_GPU:
+        return "gpu";
+        break;
+    default:
+        return NULL;
+        break;
+    }
+}
+
 // ======================================================================================================
 
 void tabla_jobs_init(TablaJobs *j) {
@@ -195,11 +214,11 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) 
     while (all != NULL) {
         Allocation *sig = all->sig;
         if (all->type == LOCAL)
-            release_resource(all->name, all->type);
-        else if (all == REMOTE) {
+            release_resource(all->name, all->amount);
+        else if (all->type == REMOTE) {
             connection_t *remote = tabla_conns_lookup(conns, all->ip);
             if (remote != NULL) {
-                snprintf(buf, sizeof(buf), "RELEASE %d\n", job_id);
+                snprintf(buf, sizeof(buf), "RELEASE %d, %s %d\n", job_id, resource_type_to_str(all->name), all->amount);
                 enqueue_write(g_epfd, remote, buf);
             }      
         }
@@ -253,7 +272,7 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
                 }
 
                 OutRequest *rel = curr->pendientes;
-                if (rel != NULL) {
+                while (rel != NULL) {
                     OutRequest *tail = rel->next;
                     free(rel);
                     rel = tail;
@@ -279,29 +298,27 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) 
         Job *job = j->tabla_jobs[i];
 
         while (job != NULL) {
-            if (job->conn == conn) {
-                /**
-                 * TODO: Hacer una copia de todos los OutRequests que tiene este elemento
-                 */
-                OutRequest *req = job->pendientes;
-                while (req != NULL) {
-                   OutRequest *nuevo = malloc(sizeof(OutRequest));
-                   nuevo->amount = req->amount;
-                   nuevo->conn = req->conn;
-                   strncpy(nuevo->ip, req->ip, sizeof(nuevo->ip) - 1);
-                   nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
-                   strncpy(nuevo->msg, req->msg, sizeof(nuevo->msg) - 1);
-                   nuevo->msg[sizeof(nuevo->msg) - 1] = '\0';
-                   nuevo->tipo = req->tipo;
+            
+            OutRequest *req = job->pendientes;
+            while (req != NULL) {
+                if (req->conn == conn) {
+                    OutRequest *nuevo = malloc(sizeof(OutRequest));
+                    nuevo->amount = req->amount;
+                    nuevo->conn = req->conn;
+                    strncpy(nuevo->ip, req->ip, sizeof(nuevo->ip) - 1);
+                    nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
+                    strncpy(nuevo->msg, req->msg, sizeof(nuevo->msg) - 1);
+                    nuevo->msg[sizeof(nuevo->msg) - 1] = '\0';
+                    nuevo->tipo = req->tipo;
 
-                   if (lista != NULL) {
-                    nuevo->next = lista;
-                   }
-
-                   lista = nuevo;
-
-                   req = req->next;
+                    if (lista != NULL)
+                    {
+                        nuevo->next = lista;
+                    }
+                    lista = nuevo;
                 }
+
+                req = req->next;
             }
             job = job->sig;
         }
@@ -342,8 +359,8 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
             nuevo->amount = sal->amount;
             nuevo->name = sal->tipo;
             nuevo->type = REMOTE;
-            strncpy(nuevo->ip, sal->ip, sizeof(sal->ip) - 1);
-            nuevo->ip[sizeof(sal->ip) - 1] = '\0';
+            strncpy(nuevo->ip, sal->ip, sizeof(nuevo->ip) - 1);
+            nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
             nuevo->job_id = job_id;
 
             nuevo->sig = curr->confirmadas;
@@ -362,6 +379,7 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
 
 Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
     
+    pthread_mutex_lock(&j->lock);
     Job *extraidos = NULL;  // lista de jobs a retornar
     
     for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
@@ -395,6 +413,6 @@ Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
         }
     }
     
-
+    pthread_mutex_unlock(&j->lock);
     return extraidos;
 }

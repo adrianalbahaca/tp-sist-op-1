@@ -8,18 +8,17 @@
 #define TAM_TABLA_CONN 71
 
 /**
- * La tabla de nodos conocidos funciona como una caché de nodos para no tener que estar creando un nodo nuevo cada vez
- * que es necesario conectarse a algún agente
+ * La tabla de nodos conocidos funciona como una caché de nodos para poder conocer los recursos de cada nodo
  * Esta tabla se implementa usando una tabla hash con buckets de listas simplemente enlazadas, con una función que toma 
  * el IP para hashear
  */
 
  // Definición de un bucket de la tabla
 typedef struct NodeEntry {
-    char ip[16];
-    int puerto;
-    int cpu_disp, mem_disp, gpu_disp;
-    time_t last_seen;
+    char ip[16]; // IP del nodo remoto conectado
+    int puerto; // Puerto del nodo remoto conectado
+    int cpu_disp, mem_disp, gpu_disp; // Cantidad de recursos disponibles
+    time_t last_seen; // Ultimo tiempo visto
     struct NodeEntry *next;
 } NodeEntry;
 

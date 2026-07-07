@@ -7,7 +7,7 @@
 ### `TablaJobs` + `Job`
 **Archivo:** `tabla_jobs.h` / `tabla_jobs.c`
 
-**Propósito:** registro central de todos los jobs activos en este nodo.
+**Propósito:** registro central de todos los jobs activos en este nodo, incluyendo los .
 
 **Ciclo de vida de un job:**
 1. Se crea cuando llega un `JOB_REQUEST` de Erlang local

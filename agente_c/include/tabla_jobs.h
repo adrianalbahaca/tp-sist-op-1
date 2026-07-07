@@ -9,17 +9,19 @@
 
 #include <pthread.h>
 
+/**
+ * Se define un enum que determina sin un Allocation fue hecho por el Erlang local o por un nodo remoto
+ */
 typedef enum {
     REMOTE,
     LOCAL
 } alloc_type_t;
 
 /**
- * La tabla de Jobs almacena las solicitudes de un Job en una lista de Allocations, con la cantidad acorde a reservar
- * y una lista de OutRequest, solicitudes pendientes de agentes remotos y local
- * La tabla se implementa con una tabla hash, donde cada bucket tiene una lista simplemente enlazada para los 
- * Allocations y una cola hecha con una lista simplemente enlazada para los OutRequests. Usa el mismo job_id como
- * clave de hasheo
+ * La tabla de Jobs almacena las solicitudes de un Job en una lista de Allocations, con la cantidad reservada y el tipo de alloc.
+ * y una lista de OutRequest, solicitudes pendientes de agentes remotos
+ * La tabla se implementa con una tabla hash, donde cada bucket tiene listas simplemente enlazadas para los 
+ * Allocations y para los OutRequests. Usa el mismo job_id como clave de hasheo
  */
 typedef struct Allocation {
     resource_t name; // Tipo de recurso
@@ -86,10 +88,9 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
 void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd);
 
 /**
- * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos
- * (vía release_resource, que SÍ toma su propio lock) y elimina los jobs.
- * NO se llama con j->mutex tomado, porque release_resource necesita tomar
- * el mutex de cada Recurso y no queremos anidar locks innecesariamente.
+ * Recorre toda la tabla buscando los jobs de la conexión dada, elimina la lista de los OutRequest de cada Job y 
+ * elimina el Job de la tabla. Se retorna una lista de todos los Allocations hechos con éxito para manejarlos en
+ * Resource Manager
  */
 Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
 
@@ -104,12 +105,15 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id);
  */
 OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn);
 
+/**
+ * Busca cada Job con la conexión dada, lo desenlaza de la tabla y crea una lista de todos los Jobs afectados, para
+ * manejarlos en el Resource Manager
+ */
 Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 
 /**
- * Declaraciones externas para usar en la librería
+ * Se define la función necesaria de forma externa
  */
-
 extern void release_resource(resource_t tipo, int amount);
 
 #endif
