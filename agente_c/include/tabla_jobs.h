@@ -78,12 +78,12 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, const char *msg);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, const char *msg, const char *g_ip);
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
-void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns);
+void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd);
 
 /**
  * Recorre toda la tabla buscando jobs de la conexión dada, libera sus recursos
@@ -109,8 +109,7 @@ Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 /**
  * Declaraciones externas para usar en la librería
  */
-extern char g_ip[16];
-extern int g_epfd;
+
 extern void release_resource(resource_t tipo, int amount);
 
 #endif
