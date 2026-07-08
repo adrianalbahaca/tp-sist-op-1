@@ -10,7 +10,7 @@
 #define BUFF_SIZE 1024
 
 #define UDP_DISCOVERY_PORT 12529
-#define NUM_THREADS 8
+#define NUM_THREADS 1
 
 /**
  * Identifica el rol de cada fd dentro del loop de epoll.

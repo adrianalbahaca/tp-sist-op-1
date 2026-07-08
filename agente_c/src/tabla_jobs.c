@@ -125,7 +125,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, const char *buf, const char *g_ip) {
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, const char *buf, const char *g_ip, result_t r) {
     pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -135,6 +135,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
         job->conn = conn;
         job->job_id = job_id;
         job->confirmadas = NULL;
+        job->pendientes = NULL;
 
         job->sig = j->tabla_jobs[idx];
         j->tabla_jobs[idx] = job;
@@ -151,6 +152,8 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 all->amount = amount;
                 all->name = type;
                 all->type = LOCAL;
+                all->conn = conn;
+                all->result = r;
 
                 all->sig = curr->confirmadas;
                 curr->confirmadas = all;
@@ -208,6 +211,8 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) 
         start = start->sig;
     }
 
+    pthread_mutex_unlock(&j->lock);
+
     // Iterar y liberar los recursos fuera de la zona crítica de la tabla
     Allocation *all = allocs_to_release;
     char buf[BUFF_SIZE];
@@ -233,8 +238,6 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) 
         free(req);
         req = sig;
     }
-
-    pthread_mutex_unlock(&j->lock);
     return;
 }
 
@@ -359,6 +362,7 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
             nuevo->amount = sal->amount;
             nuevo->name = sal->tipo;
             nuevo->type = REMOTE;
+            nuevo->result = RM_GRANTED;
             strncpy(nuevo->ip, sal->ip, sizeof(nuevo->ip) - 1);
             nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
             nuevo->job_id = job_id;
@@ -374,6 +378,36 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
         prev = sal;
         sal = sal->next;
     }
+    return false;
+}
+
+/**
+ * Verifica si todas las solicitudes externas pendientes fueron hechas y si no hay confirmadas que esté encoladas
+ */
+bool tabla_jobs_verificar(TablaJobs *j, int job_id) {
+    pthread_mutex_lock(&j->lock);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+
+    Job *curr = j->tabla_jobs[idx];
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            /**
+             * TODO: Verificar dentro de todos los Allocations si hay alguno encolado y retornar si es así
+             */
+            Allocation *s = curr->confirmadas;
+            while (s != NULL) {
+                if (s->type == LOCAL && s->result == RM_QUEUED) {
+                    pthread_mutex_unlock(&j->lock);
+                    return false;
+                }
+                s = s->sig;
+            }
+            pthread_mutex_unlock(&j->lock);
+            return (curr->pendientes == NULL);
+        }
+    }
+
+    pthread_mutex_unlock(&j->lock);
     return false;
 }
 
@@ -415,4 +449,33 @@ Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
     
     pthread_mutex_unlock(&j->lock);
     return extraidos;
+}
+
+void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn) {
+    pthread_mutex_lock(&j->lock);
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+
+    Job *job = j->tabla_jobs[idx];
+    while (job != NULL) {
+        if (job->job_id == job_id) break;
+        job = job->sig;
+    }
+
+    if (job == NULL) {
+        pthread_mutex_unlock(&j->lock);
+        return;
+    }
+
+    Allocation *alloc = job->confirmadas;
+    while (alloc != NULL) {
+        if (alloc->type == LOCAL && alloc->conn == conn) {
+            alloc->result = RM_GRANTED;
+            pthread_mutex_unlock(&j->lock);
+            return;
+        }
+        alloc = alloc->sig;
+    }
+
+    pthread_mutex_unlock(&j->lock);
+    return;
 }

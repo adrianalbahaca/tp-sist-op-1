@@ -17,6 +17,12 @@ typedef enum {
     LOCAL
 } alloc_type_t;
 
+typedef enum {
+    RM_GRANTED,
+    RM_QUEUED,
+    RM_DENIED
+} result_t;
+
 /**
  * La tabla de Jobs almacena las solicitudes de un Job en una lista de Allocations, con la cantidad reservada y el tipo de alloc.
  * y una lista de OutRequest, solicitudes pendientes de agentes remotos
@@ -29,6 +35,8 @@ typedef struct Allocation {
     alloc_type_t type;
     char ip[16]; // En caso de ser remoto, IP para enviar mensaje
     int job_id; // En caso de ser remoto, job_id de cual proviene
+    result_t result; // Verifica si es que el recurso fue hecho bien o fue encolado
+    connection_t *conn;
     struct Allocation *sig; // Siguiente reservación
 } Allocation;
 
@@ -80,7 +88,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, const char *msg, const char *g_ip);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, const char *msg, const char *g_ip, result_t r);
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
@@ -101,6 +109,11 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn);
 bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id);
 
 /**
+ * Verifica si todas las solicitudes externas pendientes fueron hechas
+ */
+bool tabla_jobs_verificar(TablaJobs *j, int job_id);
+
+/**
  * Obtener la lista de todos los pendientes en la tabla con esta conexión
  */
 OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn);
@@ -110,6 +123,9 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn);
  * manejarlos en el Resource Manager
  */
 Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
+
+void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn);
+
 
 /**
  * Se define la función necesaria de forma externa

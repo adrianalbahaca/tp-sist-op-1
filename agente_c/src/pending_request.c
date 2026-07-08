@@ -77,7 +77,7 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
 /**
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado el mutex del recurso antes
  */
-bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount) {
+bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount, origin_t origen) {
     if (c->amount + amount > max_amount)
         return false;
     
@@ -85,6 +85,7 @@ bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* 
     pending->job_id = job_id;
     pending->amount = amount;
     pending->owner_conn = conn;
+    pending->origen = origen;
     pending->sig = NULL;
 
     if (queue_is_empty(c)) {

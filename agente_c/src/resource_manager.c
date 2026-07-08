@@ -13,11 +13,6 @@
 #include <stdbool.h>
 #include <time.h>
 
-typedef enum {
-    RM_GRANTED,
-    RM_QUEUED,
-    RM_DENIED
-} result_t;
 
 // La cola de requests pendientes se implementará con una lista simplemente enlazad
 
@@ -84,7 +79,7 @@ void manager_set_ip(const char *ip) {
  */
 
 // Atiende una orden RESERVE y devuelve una respuesta acorde
-static result_t reserve_resource (resource_t tipo, int amount, int job_id, connection_t *conn) {
+static result_t reserve_resource (resource_t tipo, int amount, int job_id, connection_t *conn, origin_t origen) {
     result_t result;
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
 
@@ -95,7 +90,7 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
     else if (manager.recursos[tipo].total_amount < amount) {
         result = RM_DENIED;
     }
-    else if (queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn, manager.recursos[tipo].total_amount)) {
+    else if (queue_enqueue(&manager.recursos[tipo].cola, job_id, amount, conn, manager.recursos[tipo].total_amount, origen)) {
         result = RM_QUEUED;
     }
     else result = RM_DENIED;
@@ -126,9 +121,19 @@ void release_resource(resource_t tipo, int amount) {
         manager.recursos[tipo].available_amount -= pending->amount;
         printf("[DEQUEUE] Job %d desencolado (tipo %d, amount %d, available_restante %d)\n",
                pending->job_id, tipo, pending->amount, manager.recursos[tipo].available_amount);
-        
-        // Enviar cada job dado a su dueño correspondiente
-        snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
+        /*
+        snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
+        enqueue_write(g_epfd, pending->owner_conn, msg);
+        */
+        // Primero, verificar que ya está este 
+        tabla_jobs_cambio_alloc(&manager.tabla, pending->job_id, pending->owner_conn);
+
+        if (pending->origen == ORIGIN_REMOTE) {
+            snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
+        }
+        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id)) {
+            snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
+        }
         enqueue_write(g_epfd, pending->owner_conn, msg);
 
         // Liberar el recurso dado
@@ -212,7 +217,7 @@ void process_message(connection_t *conn, char *msg) {
     if (strncmp(msg, "RESERVE", 7) == 0) {
         reserve_msg_t result = parse_reserve(msg);
         if (result.valido) {
-            result_t r = reserve_resource(result.type, result.amount, result.job_id, conn);
+            result_t r = reserve_resource(result.type, result.amount, result.job_id, conn, ORIGIN_REMOTE);
             if (r == RM_DENIED) {
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "DENIED %d\n", result.job_id);
@@ -278,8 +283,16 @@ void process_message(connection_t *conn, char *msg) {
                     if (j->job_id == result.job_id) break;
                     j = j->sig;
                 }
+                
+                bool encolados = false;
 
-                if (j != NULL && j->pendientes == NULL) {
+                for (Allocation *a = j->confirmadas; a != NULL; a = a->sig) {
+                    if (a->result == RM_QUEUED) {
+                        encolados = true;
+                    }
+                }
+
+                if (j->pendientes == NULL && !encolados) {
                     char buf[BUFF_SIZE];
                     snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
                     printf("[TX] A ERLANG LOCAL (fd %d) -> %s", j->conn->fd, buf);
@@ -330,7 +343,7 @@ void process_message(connection_t *conn, char *msg) {
         resource_request_t *curr = result.request_list;
         while (curr != NULL) {
             if (strcmp(curr->ip, g_ip) == 0) {
-                result_t r = reserve_resource(curr->type, curr->amount, result.job_id, conn);
+                result_t r = reserve_resource(curr->type, curr->amount, result.job_id, conn, ORIGIN_LOCAL);
                 if (r == RM_DENIED) {
                     pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
@@ -356,7 +369,7 @@ void process_message(connection_t *conn, char *msg) {
                     return;
                 }
                 else if (r == RM_GRANTED || r == RM_QUEUED) {
-                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip, NULL, NULL, g_ip);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip, NULL, NULL, g_ip, r);
                 }
             }
 
@@ -375,7 +388,7 @@ void process_message(connection_t *conn, char *msg) {
                     char msg[BUFF_SIZE];
                     snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
                     enqueue_write(g_epfd, remote, msg);
-                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL, g_ip);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL, g_ip, -1);
                 }
                 else {
                     /**
@@ -411,7 +424,7 @@ void process_message(connection_t *conn, char *msg) {
                         // Enviar mensaje de solicitud de RESERVE adecuado
                         char buf[BUFF_SIZE];
                         snprintf(buf, sizeof(buf), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
-                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, n, buf, g_ip);
+                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, n, buf, g_ip, -1);
                     }
                 }
             }
@@ -420,6 +433,11 @@ void process_message(connection_t *conn, char *msg) {
 
         resource_list_destroy(result.request_list);
         
+        if (tabla_jobs_verificar(&manager.tabla, result.job_id)) {
+            char buf[BUFF_SIZE];
+            snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+            enqueue_write(g_epfd, conn, buf);
+        }
     }
     /**
      * GET_NODES

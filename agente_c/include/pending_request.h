@@ -4,14 +4,19 @@
 #include <stdbool.h>
 #include "server.h"
 
+typedef enum {
+    ORIGIN_LOCAL,
+    ORIGIN_REMOTE
+} origin_t;
+
 /**
  * La Cola de Requests Pendientes será una lista simplemente enlazada con punteros a su tope y fondo
  */
 typedef struct PendingRequest{
-    int job_id;
-    int amount;
-    connection_t *owner_conn;
-
+    int job_id; // ID del Job donde se hizo la solicitud del recurso
+    int amount; // Cantidad de recurso solicitado
+    connection_t *owner_conn; // Conexión del dueñó de la solicitud
+    origin_t origen; // Indicador si el dueño es remoto o local
     struct PendingRequest *sig; 
 } PendingRequest;
 
@@ -51,7 +56,7 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id);
  * a solicitar
  * ADVERTENCIA: Esta función no es thread-safe por sí misma. Asume que se ha tomado recurso->m antes
  */
-bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount);
+bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount, origin_t origen);
 
 /**
  * Desencola un elemento y reduce su contador de recurso a utilizar
