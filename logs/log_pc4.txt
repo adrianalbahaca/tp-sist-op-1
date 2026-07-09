@@ -1,0 +1,781 @@
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 74 mem 4564
+[RX] De AGENTE REMOTO (fd 9) -> RESERVE 70 mem 483
+[RX] De AGENTE REMOTO (fd 9) -> RESERVE 134 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 74 @10.0.0.4:cpu:1:mem:3489
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 138 @10.0.0.5:cpu:1:mem:4670
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.5)
+[LOCK] tomado tabla_conns.mutex en INSERT
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 138
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 138
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 74 mem 4564
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32285)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> RELEASE 134 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> RELEASE 70 mem 483
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 74
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 138
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 138 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 11) -> RESERVE 322 mem 3121
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 325 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 330 @10.0.0.2:cpu:1:mem:1743
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.2)
+[LOCK] tomado tabla_conns.mutex en INSERT
+==================
+WARNING: ThreadSanitizer: data race (pid=174205)
+  Read of size 4 at 0x727400021c04 by thread T5:
+    #0 worker_thread_loop agente_c/src/server.c:560 (agente+0x405638) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Previous write of size 4 at 0x727400021c04 by thread T7:
+    #0 handle_outgoing_connection_event agente_c/src/server.c:203 (agente+0x4044fa) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #1 worker_thread_loop agente_c/src/server.c:567 (agente+0x405676) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Location is heap block of size 2120 at 0x727400021c00 allocated by thread T5:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 connect_remote_node agente_c/src/server.c:137 (agente+0x404215) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 process_message agente_c/src/resource_manager.c:403 (agente+0x401ec2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404a14) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T5 (tid=174403, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T7 (tid=174417, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:560 in worker_thread_loop
+==================
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 330
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 330
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 394 @10.0.0.7:cpu:2:mem:4991
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.7)
+[LOCK] tomado tabla_conns.mutex en INSERT
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 394
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 394
+[RX] De AGENTE REMOTO (fd 11) -> RELEASE 322 mem 3121
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 325 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 330
+[RX] A AGENTE REMOTO (fd 13) -> RELEASE 330 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+==================
+WARNING: ThreadSanitizer: data race (pid=174205)
+  Read of size 8 at 0x72740000fe08 by thread T6:
+    #0 handle_tcp_read agente_c/src/server.c:265 (agente+0x404728) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Previous write of size 8 at 0x72740000fe08 by thread T2:
+    #0 handle_tcp_read agente_c/src/server.c:340 (agente+0x404aae) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Location is heap block of size 2120 at 0x72740000fa00 allocated by thread T7:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_accept agente_c/src/server.c:465 (agente+0x4050f4) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:540 (agente+0x4055a2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T6 (tid=174407, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T2 (tid=174381, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T7 (tid=174417, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:265 in handle_tcp_read
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=174205)
+  Write of size 8 at 0x72740000fa18 by thread T6:
+    #0 read <null> (libtsan.so.2+0x22cb3) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:265 (agente+0x404785) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Previous read of size 1 at 0x72740000fa18 by thread T2:
+    #0 strchr <null> (libtsan.so.2+0x21d4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:322 (agente+0x404a31) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Location is heap block of size 2120 at 0x72740000fa00 allocated by thread T7:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_accept agente_c/src/server.c:465 (agente+0x4050f4) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:540 (agente+0x4055a2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T6 (tid=174407, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T2 (tid=174381, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T7 (tid=174417, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:265 in handle_tcp_read
+==================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 394
+[RX] A AGENTE REMOTO (fd 14) -> RELEASE 394 cpu 2
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 15) -> RESERVE 578 mem 2879
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 648 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 73 @10.0.0.1:cpu:1:mem:477:gpu:1
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.1)
+[LOCK] tomado tabla_conns.mutex en INSERT
+[RX] De AGENTE REMOTO (fd 17) -> GRANTED 73
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 73
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 137 @10.0.0.1:mem:529
+[RX] De AGENTE REMOTO (fd 17) -> GRANTED 137
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 137
+[RX] De AGENTE REMOTO (fd 15) -> RELEASE 578 mem 2879
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 648 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 18) -> RESERVE 842 cpu 1
+[RX] De AGENTE REMOTO (fd 11) -> RESERVE 770 cpu 1
+[RX] De AGENTE REMOTO (fd 15) -> RESERVE 898 mem 5115
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 73
+[RX] A AGENTE REMOTO (fd 17) -> RELEASE 73 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+==================
+WARNING: ThreadSanitizer: data race (pid=174205)
+  Write of size 8 at 0x72740000fe08 by thread T5:
+    #0 handle_tcp_read agente_c/src/server.c:311 (agente+0x40499c) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Previous write of size 8 at 0x72740000fe08 by thread T2:
+    #0 handle_tcp_read agente_c/src/server.c:340 (agente+0x404aae) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Location is heap block of size 2120 at 0x72740000fa00 allocated by thread T7:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_accept agente_c/src/server.c:465 (agente+0x4050f4) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:540 (agente+0x4055a2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T5 (tid=174403, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T2 (tid=174381, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T7 (tid=174417, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:311 in handle_tcp_read
+==================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 137
+[RX] A AGENTE REMOTO (fd 17) -> RELEASE 137 mem 529
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 9) -> RESERVE 710 mem 2839
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 650 @10.0.0.8:cpu:1:mem:680
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.8)
+[LOCK] tomado tabla_conns.mutex en INSERT
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 650
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 650
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 714 @10.0.0.8:cpu:1:mem:7189
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 714
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 714
+[RX] De AGENTE REMOTO (fd 18) -> RELEASE 842 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 11) -> RELEASE 770 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 15) -> RELEASE 898 mem 5115
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=29929)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> RELEASE 710 mem 2839
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1034 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 714
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 714 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 650
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 650 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1157 mem 2186
+[RX] De AGENTE REMOTO (fd 9) -> RESERVE 1030 cpu 1
+[RX] De AGENTE REMOTO (fd 11) -> RESERVE 1026 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 906 @10.0.0.2:mem:2081
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 906
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 906
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 970 @10.0.0.1:mem:335:gpu:1
+[RX] De AGENTE REMOTO (fd 17) -> GRANTED 970
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 970
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1034 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=6)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1157 mem 2186
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> RELEASE 1030 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 11) -> RELEASE 1026 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1413 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 906
+[RX] A AGENTE REMOTO (fd 13) -> RELEASE 906 mem 2081
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 970
+[RX] A AGENTE REMOTO (fd 17) -> RELEASE 970 mem 335
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 15) -> RESERVE 1346 mem 5016
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1162 @10.0.0.4:mem:5265
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1226 @10.0.0.2:cpu:1:mem:962
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 1226
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1226
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1413 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 15) -> RELEASE 1346 mem 5016
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=27503)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1226
+[RX] A AGENTE REMOTO (fd 13) -> RELEASE 1226 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1162
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 1160 cpu 1
+[RX] De AGENTE REMOTO (fd 11) -> RESERVE 1538 mem 1723
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1418 @10.0.0.1:mem:374
+[RX] De AGENTE REMOTO (fd 17) -> GRANTED 1418
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1418
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1482 @10.0.0.5:mem:5196:gpu:1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1482
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1482
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1925 mem 2787
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 1160 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 11) -> RELEASE 1538 mem 1723
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=29981)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1482
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 1482 mem 5196
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1418
+[RX] A AGENTE REMOTO (fd 17) -> RELEASE 1418 mem 374
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 9) -> RESERVE 1542 cpu 1
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 1352 mem 3601
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1674 @10.0.0.3:cpu:1:mem:808
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.3)
+[LOCK] tomado tabla_conns.mutex en INSERT
+[RX] De AGENTE REMOTO (fd 20) -> GRANTED 1674
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1674
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1738 @10.0.0.8:cpu:2:mem:6846
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 1738
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1738
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1925 mem 2787
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=29167)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+==================
+WARNING: ThreadSanitizer: data race (pid=174205)
+  Write of size 8 at 0x727400021208 by thread T4:
+    #0 read <null> (libtsan.so.2+0x22cb3) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:265 (agente+0x404785) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Previous write of size 8 at 0x727400021208 by thread T7:
+    #0 read <null> (libtsan.so.2+0x22cb3) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:265 (agente+0x404785) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Location is heap block of size 2120 at 0x727400021200 allocated by thread T5:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_accept agente_c/src/server.c:465 (agente+0x4050f4) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:540 (agente+0x4055a2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T4 (tid=174394, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T7 (tid=174417, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T5 (tid=174403, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:265 in handle_tcp_read
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=174205)
+  Write of size 1 at 0x72740002121b by thread T4:
+    #0 handle_tcp_read agente_c/src/server.c:312 (agente+0x4049d7) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Previous read of size 6 at 0x727400021218 by thread T7:
+    #0 vprintf <null> (libtsan.so.2+0x2641d) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 printf <null> (libtsan.so.2+0x271ed) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #2 process_message agente_c/src/resource_manager.c:208 (agente+0x40133e) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404a14) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x4055c3) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Location is heap block of size 2120 at 0x727400021200 allocated by thread T5:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_accept agente_c/src/server.c:465 (agente+0x4050f4) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+    #2 worker_thread_loop agente_c/src/server.c:540 (agente+0x4055a2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T4 (tid=174394, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T7 (tid=174417, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+  Thread T5 (tid=174403, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405ee2) (BuildId: 332e09c672ead0aaeb05dc4bf82b6d2734d4dc37)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:312 in handle_tcp_read
+==================
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2117 cpu 1
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2181 mem 1750
+[RX] De AGENTE REMOTO (fd 9) -> RELEASE 1542 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 1352 mem 3601
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=31018)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1674
+[RX] A AGENTE REMOTO (fd 20) -> RELEASE 1674 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1738
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 1738 cpu 2
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 9) -> RESERVE 1734 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1930 @10.0.0.5:mem:2623:gpu:1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1930
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1930
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1994 @10.0.0.8:cpu:1:mem:8288
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 1994
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1994
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2117 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2181 mem 1750
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2373 mem 2092
+[RX] De AGENTE REMOTO (fd 9) -> RELEASE 1734 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1930
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 1930 mem 2623
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1994
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 1994 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2186 @10.0.0.1:mem:930
+[RX] De AGENTE REMOTO (fd 17) -> GRANTED 2186
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2186
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2250 @10.0.0.6:mem:7108
+[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=10.0.0.6)
+[LOCK] tomado tabla_conns.mutex en INSERT
+[RX] De AGENTE REMOTO (fd 21) -> GRANTED 2250
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2250
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 1864 mem 931
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2373 mem 2092
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=31837)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2693 cpu 1
+[RX] De AGENTE REMOTO (fd 18) -> RESERVE 2634 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2186
+[RX] A AGENTE REMOTO (fd 17) -> RELEASE 2186 mem 930
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2250
+[RX] A AGENTE REMOTO (fd 21) -> RELEASE 2250 mem 7108
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 1864 mem 931
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2442 @10.0.0.6:cpu:1:mem:5355
+[RX] De AGENTE REMOTO (fd 21) -> GRANTED 2442
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2442
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2506 @10.0.0.8:cpu:1:mem:4435
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 2506
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2506
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2693 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 18) -> RELEASE 2634 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 18) -> RESERVE 2890 mem 596
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2506
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 2506 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2442
+[RX] A AGENTE REMOTO (fd 21) -> RELEASE 2442 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2698 @10.0.0.5:cpu:1:mem:2210
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 2698
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2698
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2762 @10.0.0.8:cpu:1:mem:5898
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 2762
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2762
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 2312 mem 3594
+[RX] De AGENTE REMOTO (fd 11) -> RESERVE 2754 cpu 1
+[RX] De AGENTE REMOTO (fd 18) -> RELEASE 2890 mem 596
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=29174)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 3141 cpu 1
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 3205 mem 2493
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2698
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 2698 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2762
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 2762 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 2312 mem 3594
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=30275)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2954 @10.0.0.7:cpu:1:mem:2539
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 2954
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2954
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3018 @10.0.0.6:cpu:2:mem:5553
+[RX] De AGENTE REMOTO (fd 21) -> GRANTED 3018
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3018
+[RX] De AGENTE REMOTO (fd 11) -> RELEASE 2754 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 15) -> RESERVE 3138 cpu 1
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 3141 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=7)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 3205 mem 2493
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2954
+[RX] A AGENTE REMOTO (fd 14) -> RELEASE 2954 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3018
+[RX] A AGENTE REMOTO (fd 21) -> RELEASE 3018 cpu 2
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3146 @10.0.0.8:mem:7053
+[RX] De AGENTE REMOTO (fd 19) -> GRANTED 3146
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3146
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3210 @10.0.0.3:cpu:1:mem:2244:gpu:1
+[RX] De AGENTE REMOTO (fd 20) -> GRANTED 3210
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3210
+[RX] De AGENTE REMOTO (fd 15) -> RELEASE 3138 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 18) -> RESERVE 3658 cpu 1
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3146
+[RX] A AGENTE REMOTO (fd 19) -> RELEASE 3146 mem 7053
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3210
+[RX] A AGENTE REMOTO (fd 20) -> RELEASE 3210 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3402 @10.0.0.3:cpu:1:mem:2838
+[RX] De AGENTE REMOTO (fd 20) -> GRANTED 3402
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3402
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3466 @10.0.0.1:cpu:1:mem:518:gpu:1
+[RX] De AGENTE REMOTO (fd 17) -> GRANTED 3466
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3466
+[RX] De AGENTE REMOTO (fd 18) -> RELEASE 3658 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 11) -> RESERVE 3586 mem 268
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3402
+[RX] A AGENTE REMOTO (fd 20) -> RELEASE 3402 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3466
+[RX] A AGENTE REMOTO (fd 17) -> RELEASE 3466 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 3850 mem 3983
+[RX] De AGENTE REMOTO (fd 11) -> RELEASE 3586 mem 268
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=28785)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3594 @10.0.0.3:mem:1267:gpu:1
+[RX] De AGENTE REMOTO (fd 20) -> GRANTED 3594
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3594
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3658 @10.0.0.5:cpu:1:mem:841:gpu:1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 3658
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3658
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 3400 cpu 1
+[RX] De AGENTE REMOTO (fd 18) -> RESERVE 4106 mem 904
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 3850 mem 3983
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=31864)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 4165 mem 1174
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3658
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 3658 cpu 1
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 3594
+[RX] A AGENTE REMOTO (fd 20) -> RELEASE 3594 mem 1267
+
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 3400 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 18) -> RELEASE 4106 mem 904
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=31594)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3850 @10.0.0.7:mem:6804:gpu:1
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 3850
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3850
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 3914 @10.0.0.5:mem:3906
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 3914
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 3914
+[RX] De AGENTE REMOTO (fd 15) -> RESERVE 4226 cpu 1
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 3592 mem 4069
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 4165 mem 1174
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=28699)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 4485 mem 4245
+[RX] De AGENTE REMOTO (fd 15) -> RELEASE 4226 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=8)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 4485 mem 4245
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=28699)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 3592 mem 4069
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=32768)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
