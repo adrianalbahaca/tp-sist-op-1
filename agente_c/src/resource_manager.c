@@ -481,6 +481,7 @@ void process_message(connection_t *conn, char *msg) {
         job_release_msg_t result = parse_job_release(msg);
         if (result.valido) {
 
+            /*
             char buf[BUFF_SIZE];
             snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
                      result.job_id, result.job_id, result.job_id);
@@ -495,6 +496,7 @@ void process_message(connection_t *conn, char *msg) {
                 }
             }
             pthread_mutex_unlock(&conns.mutex);
+            */
 
             tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
 
