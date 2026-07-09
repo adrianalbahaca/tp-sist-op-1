@@ -230,7 +230,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, 
             connection_t *remote = tabla_conns_lookup(conns, all->ip);
             if (remote != NULL) {
                 snprintf(buf, sizeof(buf), "RELEASE %d %s %d\n", job_id, resource_type_to_str(all->name), all->amount);
-                printf("[RX] A AGENTE REMOTO (fd %d) -> %s\n", remote->fd, buf);
+                printf("[RX] A AGENTE REMOTO (fd %d) -> %s", remote->fd, buf);
                 enqueue_write(g_epfd, remote, buf);
             }      
         }
