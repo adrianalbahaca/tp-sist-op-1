@@ -105,9 +105,7 @@ void tabla_conns_delete(TablaConns *tabla_conns, char ip[]) {
 }
 
 void tabla_conns_delete_by_conn(TablaConns *tabla_conns, connection_t *conn) {
-    printf("[LOCK] intentando tomar tabla_conns.mutex en DELETE_BY_CONN (fd=%d)\n", conn->fd); fflush(stdout);
     pthread_mutex_lock(&tabla_conns->mutex);
-    printf("[LOCK] tomado tabla_conns.mutex en DELETE_BY_CONN\n"); fflush(stdout);
 
     for (int i = 0; i < TAM_TABLA_CONN; i++) {
         // Eliminar en la lista del bucket
@@ -135,9 +133,7 @@ void tabla_conns_delete_by_conn(TablaConns *tabla_conns, connection_t *conn) {
 }
 
 void tabla_conns_destroy(TablaConns *tabla_conns) {
-    printf("[LOCK] intentando tomar tabla_conns.mutex en DESTROY\n"); fflush(stdout);
     pthread_mutex_lock(&tabla_conns->mutex);
-    printf("[LOCK] tomado tabla_conns.mutex en DESTROY\n"); fflush(stdout);
     for (int i = 0; i < TAM_TABLA_CONN; i++) {
         if (tabla_conns->buckets[i] != NULL) {
             // Destruir la lista de conexiones dadas adentro
