@@ -285,7 +285,7 @@ void process_message(connection_t *conn, char *msg) {
                 bool encolados = false;
 
                 for (Allocation *a = j->confirmadas; a != NULL; a = a->sig) {
-                    if (a->result == RM_QUEUED) {
+                    if (a->type == LOCAL && a->result == RM_QUEUED) {
                         encolados = true;
                     }
                 }
