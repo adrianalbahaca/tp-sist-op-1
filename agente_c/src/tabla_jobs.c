@@ -125,8 +125,8 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, char *buf, const char *g_ip, result_t r) {
-    pthread_mutex_lock(&j->lock);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, char *buf, const char *g_ip, result_t r, bool take_lock) {
+    if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
     // Si el Job no está allí, se crea un Job nuevo con una lista de Allocations vacía
@@ -182,14 +182,14 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
         }
         curr = curr->sig;
     }
-    pthread_mutex_unlock(&j->lock);
+    if (take_lock) pthread_mutex_unlock(&j->lock);
 }
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
-void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) {
-    pthread_mutex_lock(&j->lock);
+void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, bool take_lock) {
+    if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
     Job *prev = NULL;
@@ -217,7 +217,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) 
         start = start->sig;
     }
 
-    pthread_mutex_unlock(&j->lock);
+    if (take_lock) pthread_mutex_unlock(&j->lock);
 
     // Iterar y liberar los recursos fuera de la zona crítica de la tabla
     Allocation *all = allocs_to_release;
@@ -391,8 +391,8 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
 /**
  * Verifica si todas las solicitudes externas pendientes fueron hechas y si no hay confirmadas que esté encoladas
  */
-bool tabla_jobs_verificar(TablaJobs *j, int job_id) {
-    pthread_mutex_lock(&j->lock);
+bool tabla_jobs_verificar(TablaJobs *j, int job_id, bool take_lock) {
+    if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
     Job *curr = j->tabla_jobs[idx];
@@ -404,17 +404,17 @@ bool tabla_jobs_verificar(TablaJobs *j, int job_id) {
             Allocation *s = curr->confirmadas;
             while (s != NULL) {
                 if (s->type == LOCAL && s->result == RM_QUEUED) {
-                    pthread_mutex_unlock(&j->lock);
+                    if (take_lock) pthread_mutex_unlock(&j->lock);
                     return false;
                 }
                 s = s->sig;
             }
-            pthread_mutex_unlock(&j->lock);
+            if (take_lock) pthread_mutex_unlock(&j->lock);
             return (curr->pendientes == NULL);
         }
     }
 
-    pthread_mutex_unlock(&j->lock);
+    if (take_lock) pthread_mutex_unlock(&j->lock);
     return false;
 }
 

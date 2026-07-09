@@ -88,12 +88,12 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, char *msg, const char *g_ip, result_t r);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, char *msg, const char *g_ip, result_t r, bool take_lock);
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
-void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd);
+void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, bool take_lock);
 
 /**
  * Recorre toda la tabla buscando los jobs de la conexión dada, elimina la lista de los OutRequest de cada Job y 
@@ -111,7 +111,7 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id);
 /**
  * Verifica si todas las solicitudes externas pendientes fueron hechas
  */
-bool tabla_jobs_verificar(TablaJobs *j, int job_id);
+bool tabla_jobs_verificar(TablaJobs *j, int job_id, bool take_lock);
 
 /**
  * Obtener la lista de todos los pendientes en la tabla con esta conexión

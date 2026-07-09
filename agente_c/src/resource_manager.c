@@ -133,7 +133,7 @@ void release_resource(resource_t tipo, int amount) {
         if (pending->origen == ORIGIN_REMOTE) {
             snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
         }
-        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id)) {
+        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, true)) {
             snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
         }
         enqueue_write(g_epfd, pending->owner_conn, msg);
@@ -236,7 +236,7 @@ void process_message(connection_t *conn, char *msg) {
 
         if (result.valido) {
             release_resource(result.type, result.amount);
-            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
 
             // PURGA DE FANTASMAS
             pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -332,10 +332,15 @@ void process_message(connection_t *conn, char *msg) {
             return;
         }
 
+        /**
+         * TODO: Hacer estas dos pasadas de forma atómica
+         */
+
         // Obtener lista de recursos a solicitar
         /**
          * 1ra pasada: Recursos locales
          */
+        pthread_mutex_lock(&manager.tabla.lock);
         resource_request_t *curr = result.request_list;
         while (curr != NULL) {
             if (strcmp(curr->ip, g_ip) == 0) {
@@ -353,7 +358,8 @@ void process_message(connection_t *conn, char *msg) {
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
+                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
+                    pthread_mutex_unlock(&manager.tabla.lock);
 
                     // Enviar mensaje JOB_DENIED al mismo Erlang
                     char buf[BUFF_SIZE];
@@ -363,13 +369,16 @@ void process_message(connection_t *conn, char *msg) {
                     return;
                 }
                 else if (r == RM_GRANTED || r == RM_QUEUED) {
-                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip, NULL, NULL, g_ip, r);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, g_ip, NULL, NULL, g_ip, r, false);
                 }
             }
 
             curr = curr->next;
         }
 
+        /**
+         * TODO: Verificar el invariante de insertar y verificar para evitar que un confirmar lo modifique antes
+         */
         /**
          * 2da pasada: Recursos remotos
          */
@@ -382,7 +391,7 @@ void process_message(connection_t *conn, char *msg) {
                     char msg[BUFF_SIZE];
                     snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
                     enqueue_write(g_epfd, remote, msg);
-                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL, g_ip, -1);
+                    tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL, g_ip, -1, false);
                 }
                 else {
                     /**
@@ -406,7 +415,8 @@ void process_message(connection_t *conn, char *msg) {
                         queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                         pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
+                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
+                        pthread_mutex_unlock(&manager.tabla.lock);
 
                         char buf[BUFF_SIZE];
                         snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
@@ -418,7 +428,7 @@ void process_message(connection_t *conn, char *msg) {
                         // Enviar mensaje de solicitud de RESERVE adecuado
                         char buf[BUFF_SIZE];
                         snprintf(buf, sizeof(buf), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
-                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, n, buf, g_ip, -1);
+                        tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, n, buf, g_ip, -1, false);
                     }
                 }
             }
@@ -427,11 +437,13 @@ void process_message(connection_t *conn, char *msg) {
 
         resource_list_destroy(result.request_list);
         
-        if (tabla_jobs_verificar(&manager.tabla, result.job_id)) {
+        if (tabla_jobs_verificar(&manager.tabla, result.job_id, false)) {
             char buf[BUFF_SIZE];
             snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
             enqueue_write(g_epfd, conn, buf);
         }
+
+        pthread_mutex_unlock(&manager.tabla.lock);
     }
     /**
      * GET_NODES
@@ -498,7 +510,7 @@ void process_message(connection_t *conn, char *msg) {
             pthread_mutex_unlock(&conns.mutex);
             */
 
-            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
 
             // PURGA DE FANTASMAS
             pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -557,7 +569,7 @@ void process_message(connection_t *conn, char *msg) {
             queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
             pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
         }
     }
     else if (strncmp(msg, "JOB_TIMEOUT", 11) == 0) {
@@ -576,7 +588,7 @@ void process_message(connection_t *conn, char *msg) {
             queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
             pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
-            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
+            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
         }
     }
     /**
