@@ -41,7 +41,7 @@ run-erl: $(ERL_BEAM)
 	erl -pa planificador_erl -noshell -s c_agent_client start
 
 clean:
-	rm -f $(TARGET) $(ERL_FILE) $(PLANIF)
+	rm -rf $(TARGET) $(ERL_FILE) $(PLANIF)
 
 
 # Comandos a ejecutar en cada terminal para correr el programa en una pc
