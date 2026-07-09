@@ -168,10 +168,11 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 if (out == NULL) {
                     exit(EXIT_FAILURE);
                 }
+                out->amount = amount;
                 out->conn = remoto;
+                out->tipo = type;
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(out->ip) - 1] = '\0';
-                out->conn = remoto;
                 snprintf(out->msg, sizeof(out->msg), "%s", buf);
 
                 out->next = curr->pendientes;
@@ -229,6 +230,8 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) 
             connection_t *remote = tabla_conns_lookup(conns, all->ip);
             if (remote != NULL) {
                 snprintf(buf, sizeof(buf), "RELEASE %d %s %d\n", job_id, resource_type_to_str(all->name), all->amount);
+                printf("Salida externa: ");
+                printf("[RX] A AGENTE REMOTO (fd %d) -> %s\n", remote->fd, buf);
                 enqueue_write(g_epfd, remote, buf);
             }      
         }
