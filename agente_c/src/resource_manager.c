@@ -217,11 +217,13 @@ void process_message(connection_t *conn, char *msg) {
             if (r == RM_DENIED) {
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "DENIED %d\n", result.job_id);
+                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
                 enqueue_write(g_epfd, conn, buf);
             }
             else if (r == RM_GRANTED) {
                 char buf[BUFF_SIZE];
                 snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
+                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
                 enqueue_write(g_epfd, conn, buf);
             }
         } else {
@@ -331,17 +333,15 @@ void process_message(connection_t *conn, char *msg) {
             fprintf(stderr, "JOB_REQUEST mal formado %s\n", msg);
             return;
         }
+        
+        pthread_mutex_lock(&manager.tabla.lock);
 
-        /**
-         * TODO: Hacer estas dos pasadas de forma atómica
-         */
+        // Obtener listas de requests a intentar
+        resource_request_t *curr = result.request_list;
 
-        // Obtener lista de recursos a solicitar
         /**
          * 1ra pasada: Recursos locales
          */
-        pthread_mutex_lock(&manager.tabla.lock);
-        resource_request_t *curr = result.request_list;
         while (curr != NULL) {
             if (strcmp(curr->ip, g_ip) == 0) {
                 result_t r = reserve_resource(curr->type, curr->amount, result.job_id, conn, ORIGIN_LOCAL);
@@ -377,9 +377,6 @@ void process_message(connection_t *conn, char *msg) {
         }
 
         /**
-         * TODO: Verificar el invariante de insertar y verificar para evitar que un confirmar lo modifique antes
-         */
-        /**
          * 2da pasada: Recursos remotos
          */
         curr = result.request_list;
@@ -390,6 +387,7 @@ void process_message(connection_t *conn, char *msg) {
                 if (remote != NULL) {
                     char msg[BUFF_SIZE];
                     snprintf(msg, sizeof(msg), "RESERVE %d %s %d\n", result.job_id, resource_type_to_str(curr->type), curr->amount);
+                    printf("[TX] A AGENTE REMOTO (fd %d) -> %s", remote->fd, msg);
                     enqueue_write(g_epfd, remote, msg);
                     tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL, g_ip, -1, false);
                 }
@@ -440,6 +438,7 @@ void process_message(connection_t *conn, char *msg) {
         if (tabla_jobs_verificar(&manager.tabla, result.job_id, false)) {
             char buf[BUFF_SIZE];
             snprintf(buf, sizeof(buf), "JOB_GRANTED %d\n", result.job_id);
+            printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
             enqueue_write(g_epfd, conn, buf);
         }
 
