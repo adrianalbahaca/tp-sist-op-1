@@ -125,7 +125,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     return NULL;
 }
 
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, const char *buf, const char *g_ip, result_t r) {
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, char *buf, const char *g_ip, result_t r) {
     pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -149,6 +149,9 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             if (strcmp(g_ip, ip) == 0) {
                 // Es una inserción a la cabeza de una lista simplemente enlazada
                 Allocation *all = malloc(sizeof(Allocation));
+                if (all == NULL) {
+                    exit(EXIT_FAILURE);
+                }
                 all->amount = amount;
                 all->name = type;
                 all->type = LOCAL;
@@ -162,12 +165,14 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             // Sino, se guarda en OutRequests
             else {
                 OutRequest *out = malloc(sizeof(OutRequest));
+                if (out == NULL) {
+                    exit(EXIT_FAILURE);
+                }
                 out->conn = remoto;
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(out->ip) - 1] = '\0';
                 out->conn = remoto;
-                strncpy(out->msg, buf, sizeof(buf)-1);
-                out->msg[sizeof(buf) - 1] = '\0';
+                snprintf(out->msg, sizeof(out->msg), "%s", buf);
 
                 out->next = curr->pendientes;
                 curr->pendientes = out;

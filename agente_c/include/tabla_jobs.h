@@ -88,7 +88,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, const char *msg, const char *g_ip, result_t r);
+void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, char *msg, const char *g_ip, result_t r);
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión

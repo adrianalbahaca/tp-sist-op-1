@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Iagente_c/include -pthread -g
+CFLAGS = -Wall -Iagente_c/include -lpthread -g -fsanitize=thread
 SRC = agente_c/src/resource_manager.c agente_c/src/parsing.c agente_c/src/server.c \
 	agente_c/src/main.c agente_c/src/pending_request.c agente_c/src/tabla_jobs.c \
 	agente_c/src/tabla_conns.c agente_c/src/tabla_node_entry.c
