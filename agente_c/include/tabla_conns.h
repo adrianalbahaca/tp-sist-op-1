@@ -12,8 +12,8 @@
  * enlazada
  */
 typedef struct ConnEntry{
-    char ip[16];
-    connection_t *conn;
+    char ip[16]; // IP de la conexión externa
+    connection_t *conn; // Estructura de la conexión
     struct ConnEntry *next;
 } ConnEntry;
 

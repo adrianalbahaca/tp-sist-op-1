@@ -1,6 +1,30 @@
 #include <stdlib.h>
 #include "pending_request.h"
 #include <stdbool.h>
+#include <stdio.h>
+
+char* type_to_str(origin_t origen) {
+    switch(origen) {
+        case ORIGIN_LOCAL:
+            return "LOCAL";
+            break;
+        case ORIGIN_REMOTE:
+            return "REMOTE";
+            break;
+        default:
+            return NULL;
+            break;
+    }
+}
+
+void queue_print(ColaPendingRequest *c) {
+    printf("[QUEUE]: [");
+    for (PendingRequest *nodo = c->top; nodo != NULL; nodo = nodo->sig) {
+        printf("job_id: %d, amount: %d, type: %s ->", nodo->job_id, nodo->amount, type_to_str(nodo->origen));
+    }
+    printf(" NULL]\n");
+    return;
+}
 
 void queue_init(ColaPendingRequest* c) {
     c->top = NULL;
@@ -51,6 +75,8 @@ void queue_delete_by_conn(ColaPendingRequest *c, connection_t *conn) {
             curr = next;
         }
     }
+    queue_print(c);
+    return;
 }
 
 void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
@@ -72,14 +98,17 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
             curr = next;
         }
     }
+    queue_print(c);
+    return;
 }
 
 /**
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado el mutex del recurso antes
  */
 bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount, origin_t origen) {
-    if (c->amount + amount > max_amount)
+    if (c->amount + amount > max_amount) {
         return false;
+    }
     
     PendingRequest* pending = malloc(sizeof(PendingRequest));
     pending->job_id = job_id;
@@ -96,7 +125,9 @@ bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* 
         c->bottom->sig = pending;
         c->bottom = pending;
     }
-        c->amount += amount;
+    c->amount += amount;
+
+    queue_print(c);
     return true;
 }
 
@@ -115,10 +146,12 @@ PendingRequest* queue_dequeue(ColaPendingRequest *c) {
         tope->sig = NULL;
 
         c->amount -= tope->amount;
+        queue_print(c);
         return tope;
     }
 
     else {
+        queue_print(c);
         return NULL;
     }
 }

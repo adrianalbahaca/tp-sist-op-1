@@ -223,7 +223,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd) 
     char buf[BUFF_SIZE];
     while (all != NULL) {
         Allocation *sig = all->sig;
-        if (all->type == LOCAL)
+        if (all->type == LOCAL && all->result == RM_GRANTED)
             release_resource(all->name, all->amount);
         else if (all->type == REMOTE) {
             connection_t *remote = tabla_conns_lookup(conns, all->ip);

@@ -41,9 +41,7 @@ void tabla_conns_insert(TablaConns *tabla_conns, char ip[], connection_t *conn) 
 }
 
 connection_t* tabla_conns_lookup(TablaConns *tabla_conns, const char ip[]) {
-    printf("[LOCK] intentando tomar tabla_conns.mutex en LOOKUP (ip=%s)\n", ip); fflush(stdout);
     pthread_mutex_lock(&tabla_conns->mutex);
-    printf("[LOCK] tomado tabla_conns.mutex en LOOKUP\n"); fflush(stdout);
     unsigned int idx = hash_ip(ip);
 
     // Buscar en la lista enlazada del bucket
@@ -80,9 +78,7 @@ const char* tabla_conns_get_ip_by_conn(TablaConns *tabla_conns, connection_t *co
 }
 
 void tabla_conns_delete(TablaConns *tabla_conns, char ip[]) {
-    printf("[LOCK] intentando tomar tabla_conns.mutex en DELETE (ip=%s)\n", ip); fflush(stdout);
     pthread_mutex_lock(&tabla_conns->mutex);
-    printf("[LOCK] tomado tabla_conns.mutex en DELETE\n"); fflush(stdout);
     unsigned int idx = hash_ip(ip);
 
     // Eliminar en la lista del bucket

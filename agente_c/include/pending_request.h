@@ -21,9 +21,9 @@ typedef struct PendingRequest{
 } PendingRequest;
 
 typedef struct {
-    PendingRequest *top;
-    PendingRequest *bottom;
-    int amount;
+    PendingRequest *top; // Tope de la cola
+    PendingRequest *bottom; // Fondo de la cola
+    int amount; // Cantidad total de recurso a reservar de liberarse toda la cola
 } ColaPendingRequest;
 
 /**

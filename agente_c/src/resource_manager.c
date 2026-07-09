@@ -80,8 +80,9 @@ void manager_set_ip(const char *ip) {
 
 // Atiende una orden RESERVE y devuelve una respuesta acorde
 static result_t reserve_resource (resource_t tipo, int amount, int job_id, connection_t *conn, origin_t origen) {
-    result_t result;
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
+    
+    result_t result;
 
     if (manager.recursos[tipo].available_amount >= amount) {
         manager.recursos[tipo].available_amount -= amount;
@@ -109,7 +110,8 @@ void release_resource(resource_t tipo, int amount) {
 
     if (queue_is_empty(cola)) {
         printf("[RELEASE] tipo %d: cola vacía, nada para desencolar (available=%d)\n", tipo, manager.recursos[tipo].available_amount);
-    } else if (manager.recursos[tipo].available_amount < cola->top->amount) {
+    } 
+    else if (manager.recursos[tipo].available_amount < cola->top->amount) {
         printf("[RELEASE] tipo %d: cola tiene job %d pidiendo %d, pero solo hay %d disponible\n",
                tipo, cola->top->job_id, cola->top->amount, manager.recursos[tipo].available_amount);
     }
@@ -353,9 +355,7 @@ void process_message(connection_t *conn, char *msg) {
 
                     tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd);
 
-                    /**
-                     * TODO: Enviar un mensaje de DENIED a quien hizo este request
-                     */
+                    // Enviar mensaje JOB_DENIED al mismo Erlang
                     char buf[BUFF_SIZE];
                     snprintf(buf, sizeof(buf),  "JOB_DENIED %d\n", result.job_id);
                     printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
@@ -485,9 +485,7 @@ void process_message(connection_t *conn, char *msg) {
             snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
                      result.job_id, result.job_id, result.job_id);
 
-            printf("[LOCK] intentando tomar tabla_conns.mutex en BROADCAST (JOB_RELEASE)\n"); fflush(stdout);
             pthread_mutex_lock(&conns.mutex);
-            printf("[LOCK] tomado tabla_conns.mutex en BROADCAST\n"); fflush(stdout);
             for (int i = 0; i < TAM_TABLA_CONN; i++) {
                 ConnEntry *curr = conns.buckets[i];
                 while (curr != NULL) {

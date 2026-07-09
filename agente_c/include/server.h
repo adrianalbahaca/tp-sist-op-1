@@ -7,7 +7,7 @@
 #include <pthread.h>
 
 #define MAX_EVENTS 64 // Límite superior de eventos del epoll para 1 única iteración (max efds)
-#define BUFF_SIZE 1024
+#define BUFF_SIZE 1024 // Tamaño máximo del buffer de cada mensaje a enviar
 
 #define UDP_DISCOVERY_PORT 12529
 #define NUM_THREADS 8
