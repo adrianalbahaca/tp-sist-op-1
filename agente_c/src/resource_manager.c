@@ -204,12 +204,6 @@ void process_message(connection_t *conn, char *msg) {
     // Identificación del origen para el log de mi consola
     const char *origen = (conn->type == CONN_TCP_CLIENT_LOCAL) ? "ERLANG LOCAL" : "AGENTE REMOTO";
     printf("[RX] De %s (fd %d) -> %s\n", origen, conn->fd, msg);
-    printf("[DEBUG_BYTES] len=%zu primeros_bytes=", strlen(msg));
-    for (size_t i = 0; i < strlen(msg) && i < 15; i++) {
-        printf("%02x ", (unsigned char)msg[i]);
-    }
-    printf("\n");
-    fflush(stdout);
     // Se parsea la primera palabra usando caso por caso dependiendo del primer comando
     /**
      * RESERVE <job_id> <recurso> <amount>

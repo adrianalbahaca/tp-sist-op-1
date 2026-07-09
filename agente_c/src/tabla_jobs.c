@@ -166,8 +166,8 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
                 strncpy(out->ip, ip, sizeof(out->ip)-1);
                 out->ip[sizeof(out->ip) - 1] = '\0';
                 out->conn = remoto;
-                strncpy(out->msg, buf, sizeof(out->msg)-1);
-                out->msg[sizeof(out->msg) - 1] = '\0';
+                strncpy(out->msg, buf, sizeof(buf)-1);
+                out->msg[sizeof(buf) - 1] = '\0';
 
                 out->next = curr->pendientes;
                 curr->pendientes = out;

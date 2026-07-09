@@ -28,7 +28,8 @@ void tabla_conns_insert(TablaConns *tabla_conns, char ip[], connection_t *conn) 
 
     ConnEntry *c = malloc(sizeof(ConnEntry));
     c->conn = conn;
-    strncpy(c->ip, ip, 16);
+    strncpy(c->ip, ip, sizeof(c->ip) - 1);
+    c->ip[sizeof(c->ip) - 1] = '\0';
 
     // Insertar elemento en el bucket dado. Es una inserción en una lista simplemente enlazada
     ConnEntry *start = tabla_conns->buckets[idx];
