@@ -633,7 +633,7 @@ void process_disconnect(connection_t *conn) {
         if (lista->type == REMOTE) {
             connection_t *remote = tabla_conns_lookup(&conns, lista->ip);
             if (remote != NULL) {
-                snprintf(buf, sizeof(buf), "RELEASE %d\n", lista->job_id);
+                snprintf(buf, sizeof(buf), "RELEASE %d %s %d\n", lista->job_id, resource_type_to_str(lista->name), lista->amount);
                 enqueue_write(g_epfd, remote, buf);
             }
         }
