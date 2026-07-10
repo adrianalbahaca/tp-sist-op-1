@@ -458,8 +458,8 @@ Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
     return extraidos;
 }
 
-void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn) {
-    pthread_mutex_lock(&j->lock);
+void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool take_lock) {
+    if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
     Job *job = j->tabla_jobs[idx];
@@ -469,7 +469,7 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn) {
     }
 
     if (job == NULL) {
-        pthread_mutex_unlock(&j->lock);
+        if (take_lock) pthread_mutex_unlock(&j->lock);
         return;
     }
 
@@ -477,12 +477,12 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn) {
     while (alloc != NULL) {
         if (alloc->type == LOCAL && alloc->conn == conn) {
             alloc->result = RM_GRANTED;
-            pthread_mutex_unlock(&j->lock);
+            if (take_lock) pthread_mutex_unlock(&j->lock);
             return;
         }
         alloc = alloc->sig;
     }
 
-    pthread_mutex_unlock(&j->lock);
+    if (take_lock) pthread_mutex_unlock(&j->lock);
     return;
 }

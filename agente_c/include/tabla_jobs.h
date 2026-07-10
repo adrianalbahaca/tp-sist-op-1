@@ -124,7 +124,7 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn);
  */
 Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 
-void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn);
+void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool take_lock);
 
 
 /**
