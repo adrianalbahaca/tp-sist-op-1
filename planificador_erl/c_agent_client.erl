@@ -7,7 +7,7 @@
 -define(HOST, "localhost").
 -define(GET_NODES, "GET_NODES\n").
 
--define(RAFAGA, 2).
+-define(RAFAGA, 3).
 
 % Arma la lista de pares que luego se utilizará para armar el mapa del nodo correspondiente
 armar_lista(Node_listed) -> 
@@ -21,7 +21,7 @@ armar_lista(Node_listed) ->
 % Similar a rand:uniform, pero desde 0 a N/3
 rand_desde_cero(0) -> 0;
 rand_desde_cero(N) -> 
-    Max = max(1, N div 6), 
+    Max = max(1, N div 3), 
     rand:uniform(Max + 1) - 1.
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock) 

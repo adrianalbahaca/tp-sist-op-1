@@ -209,18 +209,3 @@ for ns in "${PC_NAMES[@]}"; do
     echo "    Buscamos líneas de ERLANG LOCAL y a qué IP intenta mandar RESERVE:"
     grep -E "RX\]|TX\]|JOB_REQUEST|RESERVE|Fallo crítico|connect saliente|mal formado" "logs/log_${ns}.txt" 2>/dev/null
 done
-
-echo ""
-echo "======================================================================"
-echo " DIAGNÓSTICO RÁPIDO"
-echo "======================================================================"
-echo "Si en el log de alguna PC ves algo como:"
-echo "  [TX] A AGENTE REMOTO <su-propia-ip> ..."
-echo "(es decir, una PC mandando un RESERVE/conectándose a SU PROPIA ip)"
-echo "eso indica que el JOB_REQUEST de su Erlang local está usando un host"
-echo "que no matchea con el g_ip del agente, y por eso nunca toma la rama"
-echo "'local' en avanzar_reserva."
-echo ""
-echo "Si aparece 'mal formado' en cualquier log, algún JOB_REQUEST/RESERVE"
-echo "no matcheó el formato esperado del parser -- revisar el .erl que lo generó."
-echo "======================================================================"

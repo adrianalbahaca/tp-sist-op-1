@@ -21,9 +21,8 @@ static unsigned int hash_ip(const char *ip) {
 }
 
 void tabla_conns_insert(TablaConns *tabla_conns, char ip[], connection_t *conn) {
-    printf("[LOCK] intentando tomar tabla_conns.mutex en INSERT (ip=%s)\n", ip); fflush(stdout);
+    
     pthread_mutex_lock(&tabla_conns->mutex);
-    printf("[LOCK] tomado tabla_conns.mutex en INSERT\n"); fflush(stdout);
     unsigned int idx = hash_ip(ip);
 
     ConnEntry *c = malloc(sizeof(ConnEntry));

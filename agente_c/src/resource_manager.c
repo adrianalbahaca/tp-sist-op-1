@@ -346,6 +346,9 @@ void process_message(connection_t *conn, char *msg) {
             if (strcmp(curr->ip, g_ip) == 0) {
                 result_t r = reserve_resource(curr->type, curr->amount, result.job_id, conn, ORIGIN_LOCAL);
                 if (r == RM_DENIED) {
+                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
+                    pthread_mutex_unlock(&manager.tabla.lock);
+
                     pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
                     pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -357,9 +360,6 @@ void process_message(connection_t *conn, char *msg) {
                     pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
-
-                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
-                    pthread_mutex_unlock(&manager.tabla.lock);
 
                     // Enviar mensaje JOB_DENIED al mismo Erlang
                     char buf[BUFF_SIZE];
@@ -401,6 +401,9 @@ void process_message(connection_t *conn, char *msg) {
                     if (puerto != -1) n = connect_remote_node(g_epfd, curr->ip, puerto);
 
                     if (n == NULL) {
+                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
+                        pthread_mutex_unlock(&manager.tabla.lock);
+
                         pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
                         queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
                         pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
@@ -412,9 +415,6 @@ void process_message(connection_t *conn, char *msg) {
                         pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
                         queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                         pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
-
-                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
-                        pthread_mutex_unlock(&manager.tabla.lock);
 
                         char buf[BUFF_SIZE];
                         snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
@@ -645,6 +645,7 @@ void process_disconnect(connection_t *conn) {
             connection_t *remote = tabla_conns_lookup(&conns, lista->ip);
             if (remote != NULL) {
                 snprintf(buf, sizeof(buf), "RELEASE %d %s %d\n", lista->job_id, resource_type_to_str(lista->name), lista->amount);
+                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", remote->fd, buf);
                 enqueue_write(g_epfd, remote, buf);
             }
         }
@@ -702,6 +703,7 @@ void process_connection_ready(connection_t *conn) {
 
     while (lista != NULL) {
         tabla_conns_insert(&conns, lista->ip, conn);
+        printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, lista->msg);
         enqueue_write(g_epfd, conn, lista->msg);
         OutRequest *next = lista->next;
         free(lista);
@@ -787,6 +789,7 @@ void process_connection_failed(connection_t *conn) {
                 if (remote != NULL) {
                     char buf[BUFF_SIZE];
                     snprintf(buf, sizeof(buf), "RELEASE %d %s %d\n", lista->job_id, resource_type_to_str(all->name), all->amount);
+                    printf("[TX] A AGENTE REMOTO (fd %d) -> %s", remote->fd, buf);
                     enqueue_write(g_epfd, remote, buf);
                 }
             }
