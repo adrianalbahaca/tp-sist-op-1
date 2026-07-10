@@ -32,13 +32,13 @@ host_sort(Maps_list) ->
     ).
 
 armar_comando(Maps_list) -> 
-    %ListaOrdenada = lists:sort(
-    %    fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
-    %    Maps_list
-    %),
-    %armar_comando_ordenado(ListaOrdenada).
+    ListaOrdenada = lists:sort(
+        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
+        Maps_list
+    ),
+    armar_comando_ordenado(ListaOrdenada).
     
-    armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
+    %armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
 
 % Primera parte de "armar_comando"
 % Ordena la lista de nodos y arma el comando de JOB_REQUEST 
@@ -118,7 +118,8 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
                 _ ->
                     Job_id = erlang:unique_integer([positive]), 
                     gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando ++ "\n"),
-
+                    
+                    %io:format(user, "JOB_REQUEST ~p ~s~n", [Job_id, Comando]),
                     % Se calcula la cantidad de nodos (IPs) involucrados contando el delimitador '@'
                     % Tokens = string:split(string:trim(Comando), "@", all),
                     % GrantsEsperados = length(Tokens) - 1,
