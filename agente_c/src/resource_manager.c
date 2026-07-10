@@ -103,7 +103,6 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
 
 // Atiende una orden RELEASE, liberando la memoria y la cola acorde
 void release_resource(resource_t tipo, int amount) {
-    pthread_mutex_lock(&manager.tabla.lock);
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
     manager.recursos[tipo].available_amount += amount;
 
@@ -134,7 +133,7 @@ void release_resource(resource_t tipo, int amount) {
         if (pending->origen == ORIGIN_REMOTE) {
             snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
         }
-        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, false)) {
+        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, true)) {
             snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
         }
         enqueue_write(g_epfd, pending->owner_conn, msg);
@@ -143,7 +142,6 @@ void release_resource(resource_t tipo, int amount) {
         free(pending);
     }
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
-    pthread_mutex_unlock(&manager.tabla.lock);
 
 }
 
