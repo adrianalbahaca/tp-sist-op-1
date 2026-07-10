@@ -127,7 +127,7 @@ if [ ! -f ./agente ]; then
     cat /tmp/build.log
     exit 1
 fi
-if [ ! -f ./planificador_erl/c_agent_client.beam ]; then
+if [ ! -f ./c_agent_client.beam ]; then
     echo "[!] Falló la compilación del .beam de Erlang. Detalle:"
     cat /tmp/build.log
     exit 1

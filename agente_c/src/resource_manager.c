@@ -103,6 +103,7 @@ static result_t reserve_resource (resource_t tipo, int amount, int job_id, conne
 
 // Atiende una orden RELEASE, liberando la memoria y la cola acorde
 void release_resource(resource_t tipo, int amount) {
+    pthread_mutex_lock(&manager.tabla.lock);
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
     manager.recursos[tipo].available_amount += amount;
 
@@ -133,7 +134,7 @@ void release_resource(resource_t tipo, int amount) {
         if (pending->origen == ORIGIN_REMOTE) {
             snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
         }
-        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, true)) {
+        else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, false)) {
             snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
         }
         enqueue_write(g_epfd, pending->owner_conn, msg);
@@ -142,6 +143,7 @@ void release_resource(resource_t tipo, int amount) {
         free(pending);
     }
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
+    pthread_mutex_unlock(&manager.tabla.lock);
 
 }
 
@@ -346,8 +348,6 @@ void process_message(connection_t *conn, char *msg) {
             if (strcmp(curr->ip, g_ip) == 0) {
                 result_t r = reserve_resource(curr->type, curr->amount, result.job_id, conn, ORIGIN_LOCAL);
                 if (r == RM_DENIED) {
-                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
-                    pthread_mutex_unlock(&manager.tabla.lock);
 
                     pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
@@ -360,6 +360,9 @@ void process_message(connection_t *conn, char *msg) {
                     pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
                     queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+                    tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
+                    pthread_mutex_unlock(&manager.tabla.lock);
 
                     // Enviar mensaje JOB_DENIED al mismo Erlang
                     char buf[BUFF_SIZE];
@@ -401,8 +404,6 @@ void process_message(connection_t *conn, char *msg) {
                     if (puerto != -1) n = connect_remote_node(g_epfd, curr->ip, puerto);
 
                     if (n == NULL) {
-                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
-                        pthread_mutex_unlock(&manager.tabla.lock);
 
                         pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
                         queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
@@ -415,6 +416,9 @@ void process_message(connection_t *conn, char *msg) {
                         pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
                         queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
                         pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+                        tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, false);
+                        pthread_mutex_unlock(&manager.tabla.lock);
 
                         char buf[BUFF_SIZE];
                         snprintf(buf, sizeof(buf), "JOB_DENIED %d\n", result.job_id);
