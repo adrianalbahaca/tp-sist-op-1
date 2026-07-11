@@ -262,17 +262,11 @@ void process_message(connection_t *conn, char *msg) {
         if (result.valido) {
             result_t r = reserve_resource(result.type, result.amount, result.job_id, conn, ORIGIN_REMOTE);
             if (r == RM_DENIED) {
-                char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "DENIED %d\n", result.job_id);
-                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
-                enqueue_write(g_epfd, conn, buf);
+                send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "DENIED %d\n", result.job_id);
                 print_manager();
             }
             else if (r == RM_GRANTED) {
-                char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
-                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
-                enqueue_write(g_epfd, conn, buf);
+                send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "GRANTED %d\n", result.job_id);
                 print_manager();
             }
         } else {
@@ -407,7 +401,7 @@ void process_message(connection_t *conn, char *msg) {
                     pthread_mutex_unlock(&manager.tabla.lock);
 
                     // Enviar mensaje JOB_DENIED al mismo Erlang
-                    send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_DENIED%d\n", result.job_id);
+                    send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_DENIED %d\n", result.job_id);
                     return;
                 }
                 else if (r == RM_GRANTED || r == RM_QUEUED) {
@@ -504,8 +498,7 @@ void process_message(connection_t *conn, char *msg) {
         if (len > 6 && buf[len-1] == ';') buf[len-1] = '\n';
         else strcat(buf, "\n");
 
-        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
-        enqueue_write(g_epfd, conn, buf);
+        send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "%s", buf);
         print_manager();
     }
     /**

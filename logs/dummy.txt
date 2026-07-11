@@ -1,1 +1,0 @@
-Archivo creado para que la carpeta vacía 'logs" pueda existir en el repositorio
