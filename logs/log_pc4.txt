@@ -1,0 +1,818 @@
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:8, MEM: max:32768 available:32768, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 71 cpu 2
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 71
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:6, MEM: max:32768 available:32768, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 135 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 135
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:5, MEM: max:32768 available:32768, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 199 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 199
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:32768, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 72 @10.0.0.1:mem:1729:gpu:1 @10.0.0.2:mem:603 @10.0.0.3:cpu:2:mem:6832:gpu:1 @10.0.0.4:mem:4203 @10.0.0.5:cpu:1:mem:11890:gpu:1 @10.0.0.6:cpu:3:mem:10627 @10.0.0.7:cpu:1:mem:18221:gpu:1 @10.0.0.8:cpu:5:mem:3941
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A AGENTE REMOTO (fd 15) -> RESERVE 72 cpu 5
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 72 mem 603
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 72 cpu 2
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A AGENTE REMOTO (fd 13) -> RESERVE 72 cpu 3
+[TX] A AGENTE REMOTO (fd 12) -> RESERVE 72 cpu 1
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 72 mem 1729
+[TX] A AGENTE REMOTO (fd 14) -> RESERVE 72 cpu 1
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Read of size 4 at 0x727400014a04 by thread T6:
+    #0 worker_thread_loop agente_c/src/server.c:560 (agente+0x405712) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous write of size 4 at 0x727400014a04 by thread T2:
+    #0 handle_outgoing_connection_event agente_c/src/server.c:203 (agente+0x4045d4) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:567 (agente+0x405750) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is heap block of size 2120 at 0x727400014a00 allocated by thread T6:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 connect_remote_node agente_c/src/server.c:137 (agente+0x4042ef) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 process_message agente_c/src/resource_manager.c:433 (agente+0x402011) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T6 (tid=79597, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T2 (tid=79593, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:560 in worker_thread_loop
+==================
+[RX] De AGENTE REMOTO (fd 12) -> GRANTED 72
+[RX] De AGENTE REMOTO (fd 15) -> GRANTED 72
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 72
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 72
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 72
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 72
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 72
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 136 @10.0.0.1:mem:1033:gpu:1 @10.0.0.2:cpu:1:mem:3521 @10.0.0.3:cpu:1:mem:7218:gpu:1 @10.0.0.4:mem:2497 @10.0.0.5:cpu:1:mem:792:gpu:1 @10.0.0.6:mem:9990 @10.0.0.7:cpu:2:mem:954 @10.0.0.8:cpu:5:mem:4110
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 72
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 72
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 72
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 72
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:28565, GPU: max:0 available:0
+===============================================================
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 136 mem 1033
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 136 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 136 cpu 1
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 136
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Write of size 4 at 0x00000040e288 by thread T2 (mutexes: write M0, write M1):
+    #0 reserve_resource agente_c/src/resource_manager.c:133 (agente+0x400c2c) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 process_message agente_c/src/resource_manager.c:391 (agente+0x401ca0) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous read of size 4 at 0x00000040e288 by thread T5:
+    #0 print_manager agente_c/src/resource_manager.c:116 (agente+0x400ac9) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 process_message agente_c/src/resource_manager.c:349 (agente+0x401aa1) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is global 'manager' of size 824 at 0x00000040e240 (agente+0x40e288)
+
+  Mutex M0 (0x00000040e550) created at:
+    #0 pthread_mutex_init <null> (libtsan.so.2+0x1ecf8) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 tabla_jobs_init agente_c/src/tabla_jobs.c:49 (agente+0x406a2a) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 manager_init agente_c/src/resource_manager.c:207 (agente+0x40137d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 main agente_c/src/main.c:54 (agente+0x405e6b) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Mutex M1 (0x00000040e2a8) created at:
+    #0 pthread_mutex_init <null> (libtsan.so.2+0x1ecf8) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 manager_init agente_c/src/resource_manager.c:216 (agente+0x4013c8) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 main agente_c/src/main.c:54 (agente+0x405e6b) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T2 (tid=79593, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T5 (tid=79596, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/resource_manager.c:133 in reserve_resource
+==================
+[TX] A AGENTE REMOTO (fd 12) -> RESERVE 136 cpu 1
+[TX] A AGENTE REMOTO (fd 13) -> RESERVE 136 mem 9990
+[TX] A AGENTE REMOTO (fd 14) -> RESERVE 136 cpu 2
+[TX] A AGENTE REMOTO (fd 15) -> RESERVE 136 cpu 5
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 200 @10.0.0.1:mem:2602:gpu:1 @10.0.0.2:mem:3836 @10.0.0.3:cpu:1:mem:1804 @10.0.0.4:cpu:1:mem:3546 @10.0.0.5:cpu:2:mem:10726 @10.0.0.6:cpu:2:mem:1621 @10.0.0.7:cpu:4:mem:1364:gpu:1 @10.0.0.8:cpu:1:mem:1430
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 72
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+[RX] De AGENTE REMOTO (fd 12) -> GRANTED 136
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 136
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 136
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 200 mem 2602
+[RX] De AGENTE REMOTO (fd 15) -> GRANTED 136
+CPU: max:8 available:4, MEM: max:32768 available:26068, GPU: max:0 available:0
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 200 mem 3836
+===============================================================
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 200 cpu 1
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Read of size 5 at 0x727400011813 by thread T4:
+    #0 strchr <null> (libtsan.so.2+0x21d4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:322 (agente+0x404b0b) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous write of size 5 at 0x727400011813 by thread T3:
+    #0 read <null> (libtsan.so.2+0x22cb3) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:265 (agente+0x40485f) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is heap block of size 2120 at 0x727400011800 allocated by thread T6:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 connect_remote_node agente_c/src/server.c:137 (agente+0x4042ef) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 process_message agente_c/src/resource_manager.c:433 (agente+0x402011) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T4 (tid=79595, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T3 (tid=79594, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T6 (tid=79597, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:322 in handle_tcp_read
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Write of size 1 at 0x72740001181e by thread T4:
+    #0 handle_tcp_read agente_c/src/server.c:323 (agente+0x404ad4) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous write of size 7 at 0x727400011818 by thread T3:
+    #0 read <null> (libtsan.so.2+0x22cb3) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_tcp_read agente_c/src/server.c:265 (agente+0x40485f) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is heap block of size 2120 at 0x727400011800 allocated by thread T6:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 connect_remote_node agente_c/src/server.c:137 (agente+0x4042ef) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 process_message agente_c/src/resource_manager.c:433 (agente+0x402011) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T4 (tid=79595, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T3 (tid=79594, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T6 (tid=79597, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:323 in handle_tcp_read
+==================
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 136
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Write of size 4 at 0x00000040e240 by thread T2 (mutexes: write M0, write M1):
+    #0 reserve_resource agente_c/src/resource_manager.c:133 (agente+0x400c2c) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 process_message agente_c/src/resource_manager.c:391 (agente+0x401ca0) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous read of size 4 at 0x00000040e240 by thread T4:
+    #0 print_manager agente_c/src/resource_manager.c:116 (agente+0x400aeb) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 process_message agente_c/src/resource_manager.c:349 (agente+0x401aa1) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is global 'manager' of size 824 at 0x00000040e240 (agente+0x40e240)
+
+  Mutex M0 (0x00000040e550) created at:
+    #0 pthread_mutex_init <null> (libtsan.so.2+0x1ecf8) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 tabla_jobs_init agente_c/src/tabla_jobs.c:49 (agente+0x406a2a) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 manager_init agente_c/src/resource_manager.c:207 (agente+0x40137d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 main agente_c/src/main.c:54 (agente+0x405e6b) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Mutex M1 (0x00000040e260) created at:
+    #0 pthread_mutex_init <null> (libtsan.so.2+0x1ecf8) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 manager_init agente_c/src/resource_manager.c:215 (agente+0x4013b9) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 main agente_c/src/main.c:54 (agente+0x405e6b) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T2 (tid=79593, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T4 (tid=79595, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/resource_manager.c:133 in reserve_resource
+==================
+[TX] A AGENTE REMOTO (fd 12) -> RESERVE 200 cpu 2
+[TX] A AGENTE REMOTO (fd 13) -> RESERVE 200 cpu 2
+[TX] A AGENTE REMOTO (fd 14) -> RESERVE 200 cpu 4
+[TX] A AGENTE REMOTO (fd 15) -> RESERVE 200 cpu 1
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 136
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 136
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 136
+[RX] De AGENTE REMOTO (fd 12) -> GRANTED 200
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 136
+[RX] De AGENTE REMOTO (fd 15) -> GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 200
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+==================
+===============================================================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Read of size 1 at 0x727400014a20 by thread T3[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 200
+:
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+    #0 strchr <null> (libtsan.so.2+0x21d4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+    #1 handle_tcp_read agente_c/src/server.c:322 (agente+0x404b0b) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+    #2 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous write of size 1 at 0x727400014a20 by thread T7:
+    #0 handle_tcp_read agente_c/src/server.c:312 (agente+0x404ab1) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is heap block of size 2120 at 0x727400014a00 allocated by thread T6:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 connect_remote_node agente_c/src/server.c:137 (agente+0x4042ef) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 process_message agente_c/src/resource_manager.c:433 (agente+0x402011) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T3 (tid=79594, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T7 (tid=79598, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T6 (tid=79597, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:322 in handle_tcp_read
+==================
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Read of size 8 at 0x727400014e08 by thread T3:
+    #0 handle_tcp_read agente_c/src/server.c:336 (agente+0x404b30) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous write of size 8 at 0x727400014e08 by thread T7:
+    #0 handle_tcp_read agente_c/src/server.c:311 (agente+0x404a76) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is heap block of size 2120 at 0x727400014a00 allocated by thread T6:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 connect_remote_node agente_c/src/server.c:137 (agente+0x4042ef) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 process_message agente_c/src/resource_manager.c:433 (agente+0x402011) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #3 handle_tcp_read agente_c/src/server.c:326 (agente+0x404aee) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #4 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T3 (tid=79594, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T7 (tid=79598, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T6 (tid=79597, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:336 in handle_tcp_read
+==================
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 72
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 136
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 136
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 200
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 67 cpu 1
+[TX] A AGENTE REMOTO (fd 16) -> GRANTED 67
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 131 cpu 1
+[TX] A AGENTE REMOTO (fd 16) -> GRANTED 131
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 195 cpu 1
+[TX] A AGENTE REMOTO (fd 16) -> GRANTED 195
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 195 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:26068, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 77 mem 4871
+[TX] A AGENTE REMOTO (fd 17) -> GRANTED 77
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:21197, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 141 cpu 2
+[QUEUE]: [job_id: 141, amount: 2, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 205 mem 10917
+[TX] A AGENTE REMOTO (fd 17) -> GRANTED 205
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:10280, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 21) -> RESERVE 67 mem 6511
+[TX] A AGENTE REMOTO (fd 21) -> GRANTED 67
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:3769, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 21) -> RESERVE 131 cpu 1
+[TX] A AGENTE REMOTO (fd 21) -> GRANTED 131
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:3769, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 21) -> RESERVE 195 cpu 2
+[QUEUE]: [job_id: 141, amount: 2, type: REMOTE ->job_id: 195, amount: 2, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 21) -> RELEASE 67 mem 6511
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=10280)
+[QUEUE]: [job_id: 141, amount: 2, type: REMOTE ->job_id: 195, amount: 2, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:10280, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 131 cpu 1
+[RELEASE] tipo 0: cola tiene job 141 pidiendo 2, pero solo hay 1 disponible
+[QUEUE]: [job_id: 141, amount: 2, type: REMOTE ->job_id: 195, amount: 2, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:10280, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 21) -> RELEASE 131 cpu 1
+[QUEUE]: [job_id: 195, amount: 2, type: REMOTE -> NULL]
+[DEQUEUE] Job 141 desencolado (tipo 0, amount 2, available_restante 0)
+[TX] A AGENTE REMOTO (fd 17) -> GRANTED 141
+[QUEUE]: [job_id: 195, amount: 2, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:10280, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 66 cpu 1
+[QUEUE]: [job_id: 195, amount: 2, type: REMOTE ->job_id: 66, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 130 cpu 1
+[QUEUE]: [job_id: 195, amount: 2, type: REMOTE ->job_id: 66, amount: 1, type: REMOTE ->job_id: 130, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 194 mem 10257
+[TX] A AGENTE REMOTO (fd 22) -> GRANTED 194
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:23, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 135 cpu 1
+[RELEASE] tipo 0: cola tiene job 195 pidiendo 2, pero solo hay 1 disponible
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 136
+[QUEUE]: [job_id: 195, amount: 2, type: REMOTE ->job_id: 66, amount: 1, type: REMOTE ->job_id: 130, amount: 1, type: REMOTE -> NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:23, GPU: max:0 available:0
+===============================================================
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:23, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 200
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:23, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 72
+[RX] A AGENTE REMOTO (fd 13) -> RELEASE 72 cpu 3
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 72 mem 603
+[RX] A AGENTE REMOTO (fd 14) -> RELEASE 72 cpu 1
+[RX] A AGENTE REMOTO (fd 9) -> RELEASE 72 mem 1729
+[RX] A AGENTE REMOTO (fd 11) -> RELEASE 72 cpu 2
+[RX] A AGENTE REMOTO (fd 15) -> RELEASE 72 cpu 5
+[RX] A AGENTE REMOTO (fd 12) -> RELEASE 72 cpu 1
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=4226)
+[QUEUE]: [job_id: 195, amount: 2, type: REMOTE ->job_id: 66, amount: 1, type: REMOTE ->job_id: 130, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 200
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:1, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 67 cpu 1
+[QUEUE]: [job_id: 66, amount: 1, type: REMOTE ->job_id: 130, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 195 desencolado (tipo 0, amount 2, available_restante 0)
+[TX] A AGENTE REMOTO (fd 21) -> GRANTED 195
+[QUEUE]: [job_id: 66, amount: 1, type: REMOTE ->job_id: 130, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 71 cpu 2
+[QUEUE]: [job_id: 130, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 66 desencolado (tipo 0, amount 1, available_restante 1)
+[TX] A AGENTE REMOTO (fd 22) -> GRANTED 66
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 130 desencolado (tipo 0, amount 1, available_restante 0)
+[TX] A AGENTE REMOTO (fd 22) -> GRANTED 130
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+[RX] De AGENTE REMOTO (fd 17) -> RELEASE 141 cpu 2
+CPU: max:8 available:0, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 200
+==================
+WARNING: ThreadSanitizer: data race (pid=79457)
+  Read of size 8 at 0x727400010808 by thread T3:
+    #0 handle_tcp_read agente_c/src/server.c:265 (agente+0x404802) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Previous write of size 8 at 0x727400010808 by thread T5:
+    #0 handle_tcp_read agente_c/src/server.c:340 (agente+0x404b88) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #1 worker_thread_loop agente_c/src/server.c:551 (agente+0x40569d) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Location is heap block of size 2120 at 0x727400010400 allocated by thread T6:
+    #0 malloc <null> (libtsan.so.2+0x4c30c) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 handle_accept agente_c/src/server.c:465 (agente+0x4051ce) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+    #2 worker_thread_loop agente_c/src/server.c:540 (agente+0x40567c) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T3 (tid=79594, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T5 (tid=79596, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+  Thread T6 (tid=79597, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.2+0x1fd4f) (BuildId: dc0ba0fbb4c898af5813c254dc49d26023dac0d0)
+    #1 main agente_c/src/main.c:78 (agente+0x405fbc) (BuildId: 113f9752d88ae04138d0e14c837126c96881ada1)
+
+SUMMARY: ThreadSanitizer: data race agente_c/src/server.c:265 in handle_tcp_read
+==================
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 199 cpu 1
+[RX] A AGENTE REMOTO (fd 11) -> RELEASE 200 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:3, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RX] A AGENTE REMOTO (fd 9) -> RELEASE 200 mem 2602
+[RX] A AGENTE REMOTO (fd 13) -> RELEASE 200 cpu 2
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 200 mem 3836
+[RX] A AGENTE REMOTO (fd 12) -> RELEASE 200 cpu 2
+[RX] A AGENTE REMOTO (fd 14) -> RELEASE 200 cpu 4
+[RX] A AGENTE REMOTO (fd 15) -> RELEASE 200 cpu 1
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:4226, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 136
+[RX] A AGENTE REMOTO (fd 11) -> RELEASE 136 cpu 1
+[RX] A AGENTE REMOTO (fd 13) -> RELEASE 136 mem 9990
+[RX] A AGENTE REMOTO (fd 10) -> RELEASE 136 cpu 1
+[RX] A AGENTE REMOTO (fd 15) -> RELEASE 136 cpu 5
+[RX] A AGENTE REMOTO (fd 14) -> RELEASE 136 cpu 2
+[RX] A AGENTE REMOTO (fd 12) -> RELEASE 136 cpu 1
+[RX] A AGENTE REMOTO (fd 9) -> RELEASE 136 mem 1033
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=6723)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0;10.0.0.5:8000:cpu:10:mem:40960:gpu:1;10.0.0.6:8000:cpu:12:mem:49152:gpu:0;10.0.0.7:8000:cpu:14:mem:57344:gpu:1;10.0.0.8:8000:cpu:16:mem:65536:gpu:0
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:4, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 456 @10.0.0.1:mem:2075:gpu:1 @10.0.0.2:mem:2603 @10.0.0.3:cpu:2:mem:3636 @10.0.0.4:cpu:2:mem:437 @10.0.0.5:cpu:3:mem:9676 @10.0.0.6:cpu:4:mem:908 @10.0.0.7:mem:14361 @10.0.0.8:mem:2783
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 456 mem 2075
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 456 mem 2603
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 456 cpu 2
+[TX] A AGENTE REMOTO (fd 12) -> RESERVE 456 cpu 3
+[TX] A AGENTE REMOTO (fd 13) -> RESERVE 456 cpu 4
+[TX] A AGENTE REMOTO (fd 14) -> RESERVE 456 mem 14361
+[TX] A AGENTE REMOTO (fd 15) -> RESERVE 456 mem 2783
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 456
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 456
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 456
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 456
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 456
+[RX] De AGENTE REMOTO (fd 13) -> GRANTED 456
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 456
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 456
+[RX] De AGENTE REMOTO (fd 15) -> GRANTED 456
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 456
+[RX] De AGENTE REMOTO (fd 14) -> GRANTED 456
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 456
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:2, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 323 cpu 2
+[TX] A AGENTE REMOTO (fd 16) -> GRANTED 323
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:6723, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 387 mem 3782
+[TX] A AGENTE REMOTO (fd 16) -> GRANTED 387
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:2941, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 455 cpu 1
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 519 cpu 1
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 583 cpu 1
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 26) -> RESERVE 262 cpu 1
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 26) -> RESERVE 326 cpu 2
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 26) -> RESERVE 390 cpu 1
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 258 mem 10445
+[QUEUE]: [job_id: 258, amount: 10445, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 322 mem 10027
+[QUEUE]: [job_id: 258, amount: 10445, type: REMOTE ->job_id: 322, amount: 10027, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 386 cpu 1
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 27) -> RESERVE 258 mem 41
+[TX] A AGENTE REMOTO (fd 27) -> GRANTED 258
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:2900, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 27) -> RESERVE 322 cpu 1
+[TX] A AGENTE REMOTO (fd 27) -> DENIED 322
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:2900, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 27) -> RESERVE 386 mem 1676
+[TX] A AGENTE REMOTO (fd 27) -> GRANTED 386
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:1224, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 17) -> RELEASE 77 mem 4871
+[RELEASE] tipo 1: cola tiene job 258 pidiendo 10445, pero solo hay 6095 disponible
+[QUEUE]: [job_id: 455, amount: 1, type: REMOTE ->job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 258, amount: 10445, type: REMOTE ->job_id: 322, amount: 10027, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:6095, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 323 cpu 2
+[QUEUE]: [job_id: 519, amount: 1, type: REMOTE ->job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 455 desencolado (tipo 0, amount 1, available_restante 1)
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 455
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 519 desencolado (tipo 0, amount 1, available_restante 0)
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 519
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 258, amount: 10445, type: REMOTE ->job_id: 322, amount: 10027, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:6095, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 27) -> RELEASE 258 mem 41
+[RELEASE] tipo 1: cola tiene job 258 pidiendo 10445, pero solo hay 6136 disponible
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 322, amount: 10027, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:6136, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 16) -> RELEASE 387 mem 3782
+[RELEASE] tipo 1: cola tiene job 322 pidiendo 10027, pero solo hay 9918 disponible
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 322, amount: 10027, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:9918, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 333 cpu 1
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE ->job_id: 333, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 397 mem 10498
+[QUEUE]: [job_id: 322, amount: 10027, type: REMOTE ->job_id: 397, amount: 10498, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 461 mem 10761
+[QUEUE]: [job_id: 322, amount: 10027, type: REMOTE ->job_id: 397, amount: 10498, type: REMOTE ->job_id: 461, amount: 10761, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 16) -> RESERVE 515 cpu 1
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE ->job_id: 333, amount: 1, type: REMOTE ->job_id: 515, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE ->job_id: 333, amount: 1, type: REMOTE ->job_id: 515, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 322, amount: 10027, type: REMOTE ->job_id: 397, amount: 10498, type: REMOTE ->job_id: 461, amount: 10761, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 14) -> RELEASE 456 mem 14361
+[TX] A AGENTE REMOTO (fd 15) -> RELEASE 456 mem 2783
+[TX] A AGENTE REMOTO (fd 13) -> RELEASE 456 cpu 4
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 456 mem 2603
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 456 cpu 2
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 456 mem 2075
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 653 cpu 1
+[TX] A AGENTE REMOTO (fd 17) -> DENIED 653
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:9918, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 717 cpu 2
+[TX] A AGENTE REMOTO (fd 17) -> DENIED 717
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:9918, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 17) -> RESERVE 781 cpu 2
+[TX] A AGENTE REMOTO (fd 17) -> DENIED 781
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:9918, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 26) -> RESERVE 454 cpu 1
+[TX] A AGENTE REMOTO (fd 26) -> DENIED 454
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:9918, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 26) -> RESERVE 518 cpu 2
+[TX] A AGENTE REMOTO (fd 26) -> DENIED 518
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:9918, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 26) -> RESERVE 582 mem 7331
+[TX] A AGENTE REMOTO (fd 26) -> GRANTED 582
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:2587, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 450 mem 2437
+[TX] A AGENTE REMOTO (fd 22) -> GRANTED 450
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:150, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 514 mem 5610
+[TX] A AGENTE REMOTO (fd 22) -> DENIED 514
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:150, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 22) -> RESERVE 578 mem 7510
+[TX] A AGENTE REMOTO (fd 22) -> DENIED 578
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:150, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 27) -> RESERVE 514 mem 10003
+[TX] A AGENTE REMOTO (fd 27) -> DENIED 514
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:150, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 27) -> RESERVE 578 cpu 2
+[TX] A AGENTE REMOTO (fd 27) -> DENIED 578
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:150, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 27) -> RESERVE 642 cpu 1
+[TX] A AGENTE REMOTO (fd 27) -> DENIED 642
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:150, GPU: max:0 available:0
+===============================================================
+[RX] De AGENTE REMOTO (fd 22) -> RELEASE 450 mem 2437
+[RELEASE] tipo 1: cola tiene job 322 pidiendo 10027, pero solo hay 2587 disponible
+[QUEUE]: [job_id: 583, amount: 1, type: REMOTE ->job_id: 262, amount: 1, type: REMOTE ->job_id: 326, amount: 2, type: REMOTE ->job_id: 390, amount: 1, type: REMOTE ->job_id: 386, amount: 1, type: REMOTE ->job_id: 333, amount: 1, type: REMOTE ->job_id: 515, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [job_id: 322, amount: 10027, type: REMOTE ->job_id: 397, amount: 10498, type: REMOTE ->job_id: 461, amount: 10761, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[MANAGER] ============ STATUS ACTUAL DEL MANAGER 10.0.0.4 ============
+CPU: max:8 available:0, MEM: max:32768 available:2587, GPU: max:0 available:0
+===============================================================

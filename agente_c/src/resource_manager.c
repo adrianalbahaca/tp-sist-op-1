@@ -112,9 +112,9 @@ void send_message(connection_t *conn, int epfd, dest_t dest, const char *fmt, ..
 }
 
 void print_manager() {
-    printf("[MANAGER] STATUS ACTUAL DEL MANAGER %s ============\n", g_ip);
+    printf("[MANAGER] ============ STATUS ACTUAL DEL MANAGER %s ============\n", g_ip);
     printf("CPU: max:%d available:%d, MEM: max:%d available:%d, GPU: max:%d available:%d\n", manager.recursos[RESOURCE_CPU].total_amount, manager.recursos[RESOURCE_CPU].available_amount, manager.recursos[RESOURCE_MEM].total_amount, manager.recursos[RESOURCE_MEM].available_amount, manager.recursos[RESOURCE_GPU].total_amount, manager.recursos[RESOURCE_GPU].available_amount);
-    printf("===================================================\n");
+    printf("===============================================================\n");
 }
 
 /**
@@ -341,7 +341,7 @@ void process_message(connection_t *conn, char *msg) {
                     }
                 }
 
-                if (j->pendientes == NULL && !encolados) {
+                if (j->pendientes != NULL && !encolados) {
                     send_message(j->conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_GRANTED %d\n", result.job_id);
                 }
             }
