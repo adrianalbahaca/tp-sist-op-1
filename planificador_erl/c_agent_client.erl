@@ -155,8 +155,8 @@ get_nodes(Socket) ->
             
             ListDeMapas;
 
-        _ ->
-            io:format("Error: No se pudo recibir la información sobre los nodos~n"),
+        {_, Mensaje} ->
+            io:format("Error: No se pudo recibir la información sobre los nodos: ~p ~n", [Mensaje]),
             gen_tcp:close(Socket),
             []
     end.

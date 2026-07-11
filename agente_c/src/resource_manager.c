@@ -80,37 +80,11 @@ void manager_set_ip(const char *ip) {
     return;
 }
 
-static char *resource_type_to_str(resource_t type) {
-    switch (type) {
-    case RESOURCE_CPU:
-        return "cpu";
-        break;
-    case RESOURCE_MEM:
-        return "mem";
-        break;
-    case RESOURCE_GPU:
-        return "gpu";
-        break;
-    default:
-        return NULL;
-        break;
-    }
+void print_manager() {
+    printf("[MANAGER] STATUS ACTUAL DEL MANAGER %s ============\n", g_ip);
+    printf("CPU: max:%d available:%d, MEM: max:%d available:%d, GPU: max:%d available:%d\n", manager.recursos[RESOURCE_CPU].total_amount, manager.recursos[RESOURCE_CPU].available_amount, manager.recursos[RESOURCE_MEM].total_amount, manager.recursos[RESOURCE_MEM].available_amount, manager.recursos[RESOURCE_GPU].total_amount, manager.recursos[RESOURCE_GPU].available_amount);
+    printf("===================================================\n");
 }
-
-void send_message(connection_t *conn, int epfd, dest_t dest, const char *fmt, ...) {
-    char buf[BUFF_SIZE];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-
-    const char *dest_str = (dest == DEST_ERLANG_LOCAL) ? "ERLANG LOCAL" : "AGENTE REMOTO";
-    printf("[TX] A %s (fd %d) -> %s", dest_str, conn->fd, buf);
-
-    enqueue_write(epfd, conn, buf);
-}
-
-// =====================================================================================
 
 /**
  * =====================================================================================
@@ -257,10 +231,18 @@ void process_message(connection_t *conn, char *msg) {
         if (result.valido) {
             result_t r = reserve_resource(result.type, result.amount, result.job_id, conn, ORIGIN_REMOTE);
             if (r == RM_DENIED) {
-                send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "DENIED %d\n", result.job_id);
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "DENIED %d\n", result.job_id);
+                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
+                enqueue_write(g_epfd, conn, buf);
+                print_manager();
             }
             else if (r == RM_GRANTED) {
-                send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "GRANTED %d\n", result.job_id);
+                char buf[BUFF_SIZE];
+                snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
+                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
+                enqueue_write(g_epfd, conn, buf);
+                print_manager();
             }
         } else {
             fprintf(stderr, "[!] RESERVE mal formado: %s\n", msg);
@@ -288,6 +270,8 @@ void process_message(connection_t *conn, char *msg) {
             pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
             queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
             pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+            print_manager();
         }
         else {
             fprintf(stderr, "RELEASE mal formado %s\n", msg);
@@ -330,10 +314,8 @@ void process_message(connection_t *conn, char *msg) {
                     send_message(j->conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_GRANTED %d\n", result.job_id);
                 }
             }
-            else {
-
-            }
             pthread_mutex_unlock(&manager.tabla.lock);
+            print_manager();
 
         } else {
             fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
@@ -349,6 +331,7 @@ void process_message(connection_t *conn, char *msg) {
             if (owner != NULL) {
                 send_message(owner, g_epfd, DEST_ERLANG_LOCAL, "JOB_DENIED %d\n", result.job_id);
             }
+            print_manager();
         } else {
             fprintf(stderr, "DENIED mal formado: %s\n", msg);
         }
@@ -458,6 +441,7 @@ void process_message(connection_t *conn, char *msg) {
         }
 
         pthread_mutex_unlock(&manager.tabla.lock);
+        print_manager();
     }
     /**
      * GET_NODES
@@ -491,6 +475,7 @@ void process_message(connection_t *conn, char *msg) {
 
         printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
         enqueue_write(g_epfd, conn, buf);
+        print_manager();
     }
     /**
      * ANNOUNCE
@@ -538,6 +523,8 @@ void process_message(connection_t *conn, char *msg) {
             pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
             queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
             pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+            print_manager();
         }
         else {
             fprintf(stderr, "JOB_RELEASE mal formado: %s\n", msg);
@@ -556,6 +543,7 @@ void process_message(connection_t *conn, char *msg) {
             else {
                 send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_STATUS %d UNKNOWN\n", result.job_id);
             }
+            print_manager();
         }
         else {
             fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
@@ -582,6 +570,7 @@ void process_message(connection_t *conn, char *msg) {
             pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
             tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
+            print_manager();
         }
     }
     else if (strncmp(msg, "JOB_TIMEOUT", 11) == 0) {
@@ -601,6 +590,7 @@ void process_message(connection_t *conn, char *msg) {
             pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
             tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
+            print_manager();
         }
     }
     /**
@@ -719,6 +709,7 @@ void process_connection_ready(connection_t *conn) {
         free(lista);
         lista = next;
     }
+    print_manager();
     return;
 }
 
@@ -814,4 +805,6 @@ void process_connection_failed(connection_t *conn) {
         free(lista);
         lista = sig;
     }
+    print_manager();
+    return;
 }
