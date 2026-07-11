@@ -1,0 +1,51 @@
+[12:05:34] [JOB 69] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:34] [JOB 133] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:34] [JOB 197] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:34] [JOB 130] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:34] [JOB 68] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:05:34] [JOB 132] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:34] [JOB 196] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:05:34] [JOB 140] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:05:34] [JOB 204] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:05:39] [JOB 66] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:39] [JOB 194] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:39] [JOB 76] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:44] [JOB 388] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:44] [JOB 324] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:44] [JOB 452] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:49] [JOB 332] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:50] [JOB 836] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:05:54] [JOB 396] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:54] [JOB 450] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:59] [JOB 708] [OTORGADO] -> Recursos reservados correctamente.
+[12:05:59] [JOB 460] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:04] [JOB 772] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:06] [JOB 716] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:06] [JOB 780] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:09] [JOB 844] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:11] [JOB 1028] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:11] [JOB 1092] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:13] [JOB 645] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:15] [JOB 1100] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:15] [JOB 1228] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:16] [JOB 1156] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:16] [JOB 1164] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:16] [JOB 709] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:22] [JOB 1412] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:23] [JOB 1420] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:48] [JOB 965] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:48] [JOB 1029] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:48] [JOB 1093] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:51] [JOB 1157] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:51] [JOB 1221] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:51] [JOB 1285] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:51] [JOB 1540] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:54] [JOB 1026] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:56] [JOB 1349] [OTORGADO] -> Recursos reservados correctamente.
+[12:06:58] [JOB 1732] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:58] [JOB 1796] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:06:58] [JOB 1860] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:07:27] [JOB 1090] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:07:27] [JOB 1154] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:07:28] [JOB 66] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
+[12:07:28] [JOB 194] [DENEGADO] -> Fallo en la reserva. Nodos saturados.
