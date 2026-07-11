@@ -70,6 +70,24 @@ static char g_ip[16];
  * Funciones auxiliares
  * =====================================================================================
  */
+static char *resource_type_to_str(resource_t type) {
+    switch (type)
+    {
+    case RESOURCE_CPU:
+        return "cpu";
+        break;
+    case RESOURCE_MEM:
+        return "mem";
+        break;
+    case RESOURCE_GPU:
+        return "gpu";
+        break;
+    default:
+        return NULL;
+        break;
+    }
+}
+
 void manager_set_epoll(int epfd) {
     g_epfd = epfd;
 }
@@ -78,6 +96,19 @@ void manager_set_ip(const char *ip) {
     strncpy(g_ip, ip, sizeof(g_ip) - 1);
     g_ip[sizeof(g_ip) - 1] = '\0';
     return;
+}
+
+void send_message(connection_t *conn, int epfd, dest_t dest, const char *fmt, ...) {
+    char buf[BUFF_SIZE];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    
+    const char *dest_str = (dest == DEST_ERLANG_LOCAL) ? "ERLANG LOCAL" : "AGENTE REMOTO";
+    printf("[TX] A %s (fd %d) -> %s", dest_str, conn->fd, buf);
+    
+    enqueue_write(epfd, conn, buf);
 }
 
 void print_manager() {
