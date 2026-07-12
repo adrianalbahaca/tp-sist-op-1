@@ -262,7 +262,9 @@ static void handle_udp_read(connection_t *conn) {
 
 /* Lee los datos de la conexión TCP */
 static int handle_tcp_read(int epfd, connection_t *conn) {
+    pthread_mutex_lock(&conn->write_mutex);
     int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
+    pthread_mutex_unlock(&conn->write_mutex);
 
     if (bytes_read < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
