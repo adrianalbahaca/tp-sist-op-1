@@ -4,3 +4,4 @@ github.txt
 *.beam
 'Informe de equipo Marron (27 y 03).pdf'
 /logs
+*.dump

@@ -126,6 +126,7 @@ Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 
 void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool take_lock);
 
+bool tabla_jobs_buscar(TablaJobs *j, int job_id);
 
 /**
  * Se define la función necesaria de forma externa

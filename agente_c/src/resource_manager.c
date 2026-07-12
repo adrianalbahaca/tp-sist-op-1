@@ -317,6 +317,12 @@ void process_message(connection_t *conn, char *msg) {
                 fprintf(stderr, "GRANTED de una conexión desconocida\n");
             }
             pthread_mutex_lock(&manager.tabla.lock);
+
+            if (!tabla_jobs_buscar(&manager.tabla, result.job_id)) {
+                pthread_mutex_unlock(&manager.tabla.lock);
+                return;
+            }
+
             bool confirmado = tabla_jobs_confirmar(&manager.tabla, ip_remoto, result.job_id);
 
             if (confirmado) {
@@ -354,6 +360,20 @@ void process_message(connection_t *conn, char *msg) {
         if (result.valido) {
             connection_t *owner = tabla_jobs_get_conn(&manager.tabla ,result.job_id);
             if (owner != NULL) {
+                tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
+
+                pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+                queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
+                pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+                pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+                queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
+                pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+                pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+                queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
+                pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
                 send_message(owner, g_epfd, DEST_ERLANG_LOCAL, "JOB_DENIED %d\n", result.job_id);
             }
             print_manager();

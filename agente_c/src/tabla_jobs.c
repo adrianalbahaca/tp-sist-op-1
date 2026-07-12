@@ -224,7 +224,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, 
     char buf[BUFF_SIZE];
     while (all != NULL) {
         Allocation *sig = all->sig;
-        if (all->type == LOCAL && all->result == RM_GRANTED)
+        if (all->type == LOCAL)
             release_resource(all->name, all->amount);
         else if (all->type == REMOTE) {
             connection_t *remote = tabla_conns_lookup(conns, all->ip);
@@ -485,4 +485,10 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool 
 
     if (take_lock) pthread_mutex_unlock(&j->lock);
     return;
+}
+
+bool tabla_jobs_buscar(TablaJobs *j, int job_id) {
+    int idx = job_id % TAM_TABLA_JOBS;
+    Job* job = j->tabla_jobs[idx];
+    return buscar_job_tabla(job, job_id);
 }
