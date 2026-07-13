@@ -133,11 +133,12 @@ void release_resource(resource_t tipo, int amount) {
 
         if (pending->origen == ORIGIN_REMOTE) {
             snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
+            enqueue_write(g_epfd, pending->owner_conn, msg);
         }
         else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, false)) {
             snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
+            enqueue_write(g_epfd, pending->owner_conn, msg);
         }
-        enqueue_write(g_epfd, pending->owner_conn, msg);
 
         // Liberar el recurso dado
         free(pending);
@@ -266,12 +267,14 @@ void process_message(connection_t *conn, char *msg) {
         granted_msg_t result = parse_granted(msg);
         if (result.valido) {
             /**
-             * Se procesa el pendiente con el job_id dado
-             * Si la lista de pendientes a procesar se vacía, avisar con algún indicador y enviar un JOB_GRANTED a conn
+             * TODO: Revisa de quién fue el Job. Verifica si existe, y extrae el pendiente para moverlo al confirmado
+             * Si los confirmados están vacíos y todo salió bien, envía JOB_GRANTED
              */
+            /*
             const char *ip_remoto = tabla_conns_get_ip_by_conn(&conns, conn);
             if (ip_remoto == NULL) {
                 fprintf(stderr, "GRANTED de una conexión desconocida\n");
+                return;
             }
             pthread_mutex_lock(&manager.tabla.lock);
             bool confirmado = tabla_jobs_confirmar(&manager.tabla, ip_remoto, result.job_id);
@@ -303,6 +306,7 @@ void process_message(connection_t *conn, char *msg) {
 
             }
             pthread_mutex_unlock(&manager.tabla.lock);
+            */
 
         } else {
             fprintf(stderr, "[!] GRANTED mal formado: %s\n", msg);
@@ -314,6 +318,12 @@ void process_message(connection_t *conn, char *msg) {
     else if (strncmp(msg, "DENIED", 6) == 0) {
         denied_msg_t result = parse_denied(msg);
         if (result.valido) {
+
+            /**
+             * TODO: Revisa quién fue que pidió este Job. Si fue alguien local, libera todo lo relacionado con ese Job
+             * y termina
+             */
+            /*
             connection_t *owner = tabla_jobs_get_conn(&manager.tabla ,result.job_id);
             if (owner != NULL) {
                 char buf[BUFF_SIZE];
@@ -321,6 +331,7 @@ void process_message(connection_t *conn, char *msg) {
                 printf("[TX] A ERLANG LOCAL (fd %d) -> %s", owner->fd, buf);
                 enqueue_write(g_epfd, owner, buf);
             }
+            */
         } else {
             fprintf(stderr, "DENIED mal formado: %s\n", msg);
         }
@@ -339,11 +350,45 @@ void process_message(connection_t *conn, char *msg) {
         pthread_mutex_lock(&manager.tabla.lock);
 
         // Obtener listas de requests a intentar
-        resource_request_t *curr = result.request_list;
+        resource_request_t *head = result.request_list;
 
         /**
-         * 1ra pasada: Recursos locales
+         * TODO: Redefinir el JOB_REQUEST, tal que se fabrique el Job en el sitio y no se inserte hasta que
+         * esté todo listo
          */
+
+         Job* nuevo_job = malloc(sizeof(Job));
+         nuevo_job->job_id = result.job_id;
+         nuevo_job->conn = conn;
+        
+        /**
+         * Ir procesando la lista de requests uno por uno
+         */
+        while (head != NULL) {
+            if (strcmp(head->ip, g_ip) == 0) {
+                /**
+                 * TODO: Insertar este nuevo elemento en el nuevo Job recién creado, si todo sale bien
+                 * Sino, elimina todo, avisa a las solicitudes externas que liberen y corta
+                 */
+            }
+            else {
+                /**
+                 * TODO: Intenta conectarte a uno de los nodos externos y guardalo. Si se conecta sin problemas, guarda
+                 * en el nuevo Job. Sino, elimina todo, avisa a las solicitudes externas que liberen y corta
+                 */
+            }
+            head = head->next;
+        }
+
+        resource_list_destroy(result.request_list);
+
+        /**
+         * TODO: Inserta este nuevo Job recién armado a la tabla
+         */
+
+        pthread_mutex_unlock(&manager.tabla.lock);
+        /*
+        
         while (curr != NULL) {
             if (strcmp(curr->ip, g_ip) == 0) {
                 result_t r = reserve_resource(curr->type, curr->amount, result.job_id, conn, ORIGIN_LOCAL);
@@ -379,9 +424,7 @@ void process_message(connection_t *conn, char *msg) {
             curr = curr->next;
         }
 
-        /**
-         * 2da pasada: Recursos remotos
-         */
+        
         curr = result.request_list;
         while (curr != NULL) {
             if (strcmp(curr->ip, g_ip) != 0) {
@@ -395,9 +438,7 @@ void process_message(connection_t *conn, char *msg) {
                     tabla_jobs_insert(&manager.tabla, conn, result.job_id, curr->type, curr->amount, manager.recursos[curr->type].total_amount, curr->ip, remote, NULL, g_ip, -1, false);
                 }
                 else {
-                    /**
-                     * Iniciar o conectar con conexión asíncrona
-                     */
+                    
                     int puerto = tabla_nodos_get_puerto(curr->ip);
                     connection_t *n = NULL;
 
@@ -447,6 +488,7 @@ void process_message(connection_t *conn, char *msg) {
         }
 
         pthread_mutex_unlock(&manager.tabla.lock);
+        */
     }
     /**
      * GET_NODES
@@ -496,23 +538,6 @@ void process_message(connection_t *conn, char *msg) {
         job_release_msg_t result = parse_job_release(msg);
         if (result.valido) {
 
-            /*
-            char buf[BUFF_SIZE];
-            snprintf(buf, sizeof(buf), "RELEASE %d cpu 0\nRELEASE %d mem 0\nRELEASE %d gpu 0\n", 
-                     result.job_id, result.job_id, result.job_id);
-
-            pthread_mutex_lock(&conns.mutex);
-            for (int i = 0; i < TAM_TABLA_CONN; i++) {
-                ConnEntry *curr = conns.buckets[i];
-                while (curr != NULL) {
-                    printf("[TX] BROADCAST INTERNO A AGENTE %s (fd %d) -> %s", curr->ip, curr->conn->fd, buf);
-                    enqueue_write(g_epfd, curr->conn, buf);
-                    curr = curr->next;
-                }
-            }
-            pthread_mutex_unlock(&conns.mutex);
-            */
-
             tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
 
             // PURGA DE FANTASMAS
@@ -552,28 +577,6 @@ void process_message(connection_t *conn, char *msg) {
             fprintf(stderr, "JOB_STATUS mal formado: %s\n", msg);
         }
     
-    }
-    else if (strncmp(msg, "JOB_DENIED", 10) == 0) {
-        job_denied_msg_t result = parse_job_denied(msg);
-        
-        if (result.valido) {
-            /**
-             * TODO: Elimnar todos los Jobs adecuados
-             */
-            pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
-            queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, result.job_id);
-            pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
-
-            pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
-            queue_delete_by_job_id(&manager.recursos[RESOURCE_MEM].cola, result.job_id);
-            pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
-
-            pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
-            queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, result.job_id);
-            pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
-
-            tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true);
-        }
     }
     else if (strncmp(msg, "JOB_TIMEOUT", 11) == 0) {
         job_timeout_msg_t result = parse_job_timeout(msg);
