@@ -22,7 +22,7 @@ armar_lista(Node_listed) ->
 % Similar a rand:uniform, pero desde 0 a N/DIVISOR
 rand_recurso(0) -> 0;
 rand_recurso(N) -> 
-    Max = max(1, N div 3), 
+    Max = max(1, N div ?DIVISOR), 
     rand:uniform(Max + 1) - 1.
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock) 
