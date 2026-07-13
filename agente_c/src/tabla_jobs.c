@@ -236,7 +236,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
-void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, bool take_lock) {
+void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, bool take_lock, bool take_lock_reserve) {
     if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -273,7 +273,7 @@ void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, 
     while (all != NULL) {
         Allocation *sig = all->sig;
         if (all->type == LOCAL && all->result == RM_GRANTED)
-            release_resource(all->name, all->amount);
+            release_resource(all->name, all->amount, take_lock_reserve);
         else if (all->type == REMOTE) {
             connection_t *remote = tabla_conns_lookup(conns, all->ip);
             if (remote != NULL) {

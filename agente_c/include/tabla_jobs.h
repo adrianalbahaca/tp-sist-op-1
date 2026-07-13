@@ -99,7 +99,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
  */
-void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, bool take_lock);
+void tabla_jobs_remove(TablaJobs *j, int job_id, TablaConns *conns, int g_epfd, bool take_lock, bool take_lock_reserve);
 
 /**
  * Recorre toda la tabla buscando los jobs de la conexión dada, elimina la lista de los OutRequest de cada Job y 
@@ -141,6 +141,6 @@ Job* tabla_jobs_extract_by_id(TablaJobs *t, int job_id);
 /**
  * Se define la función necesaria de forma externa
  */
-extern void release_resource(resource_t tipo, int amount);
+extern void release_resource(resource_t tipo, int amount, bool take_lock);
 
 #endif
