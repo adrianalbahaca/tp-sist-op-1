@@ -92,16 +92,6 @@
 
 ---
 
-## Estructuras eliminadas (diseño anterior)
-
-Estas estructuras existían en el diseño anterior y fueron reemplazadas por las de arriba:
-
-- **`job_owners`** → reemplazada por `TablaJobs` (el campo `conn` de cada `Job`)
-- **`pendientes_salientes`** → reemplazada por la lista `pendientes` de `OutRequest` dentro de cada `Job`
-- **`OutReq`** (struct local en `resource_manager.c`) → reemplazada por `OutRequest` en `tabla_jobs.h`
-
----
-
 ## Flujos principales
 
 ### JOB_REQUEST

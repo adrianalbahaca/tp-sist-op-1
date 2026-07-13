@@ -7,7 +7,7 @@
 -define(HOST, "localhost").
 -define(GET_NODES, "GET_NODES\n").
 
--define(RAFAGA, 3).
+-define(RAFAGA, 2).
 
 % Arma la lista de pares que luego se utilizará para armar el mapa del nodo correspondiente
 armar_lista(Node_listed) -> 
