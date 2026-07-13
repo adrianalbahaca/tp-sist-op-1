@@ -21,7 +21,7 @@ armar_lista(Node_listed) ->
 % Similar a rand:uniform, pero desde 0 a N/3
 rand_desde_cero(0) -> 0;
 rand_desde_cero(N) -> 
-    Max = max(1, N div 4), 
+    Max = max(1, N div 64), 
     rand:uniform(Max + 1) - 1.
 
 % Ordena los nodos según el valor de "host" (Estrategia anti-deadlock) 
@@ -38,7 +38,7 @@ armar_comando(Maps_list) ->
     ),
     armar_comando_ordenado(ListaOrdenada).
     
-    %armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
+    % armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
 
 % Primera parte de "armar_comando"
 % Ordena la lista de nodos y arma el comando de JOB_REQUEST 
@@ -154,6 +154,10 @@ get_nodes(Socket) ->
             ],
             
             ListDeMapas;
+
+        {ok, Mensaje} ->
+            io:format("Precaución: Mensaje temprano: ~p ~n", [Mensaje]),
+            get_nodes(Socket);
 
         {error, Reason} ->
             io:format("Error: No se pudo recibir la información sobre los nodos: ~p ~n", [Reason]),

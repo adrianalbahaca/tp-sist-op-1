@@ -546,6 +546,7 @@ void process_message(connection_t *conn, char *msg)
                             }
                         }
                         Allocation *next = allocs->sig;
+                        free(allocs);
                         allocs = next;
                     }
 
@@ -617,6 +618,7 @@ void process_message(connection_t *conn, char *msg)
                                 }
                             }
                             Allocation *next = allocs->sig;
+                            free(allocs);
                             allocs = next;
                         }
 
@@ -858,14 +860,12 @@ void process_message(connection_t *conn, char *msg)
             {
                 OutRequest *next = req->next;
                 free(req);
-                next = req;
+                req = next;
             }
 
             free(eliminar_job);
 
             limpiar_colas(result.job_id);
-
-            pthread_mutex_unlock(&manager.tabla.lock);
         }
         else
         {
