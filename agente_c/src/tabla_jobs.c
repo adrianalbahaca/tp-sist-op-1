@@ -4,6 +4,42 @@
 #include "tabla_conns.h"
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
+
+/**
+ * ======================================================================================================
+ * Funciones de Jobs
+ * ======================================================================================================
+ */
+OutRequest* crear_outrequest(char* ip, connection_t *conn, resource_t type, int amount, char *msg) {
+    OutRequest *result = malloc(sizeof(OutRequest));
+    assert(result != NULL);
+
+    result->amount = amount;
+    result->conn = conn;
+    strncpy(result->ip, ip, sizeof(result->ip) - 1);
+    result->ip[sizeof(result->ip) - 1] = '\0';
+    if (msg != NULL)
+        snprintf(result->msg, sizeof(result->msg), "%s", msg);
+    result->tipo = type;
+    return result;
+}
+
+Allocation* crear_allocation(resource_t type, int amount, alloc_type_t alloc_type, char *ip, int job_id, result_t result, connection_t *conn) {
+    Allocation *res = malloc(sizeof(Allocation));
+    assert(res != NULL);
+
+    res->amount = amount;
+    res->conn = conn;
+    strncpy(res->ip, ip, sizeof(res->ip) - 1);
+    res->ip[sizeof(res->ip) - 1] = '\0';
+    res->job_id = job_id;
+    res->name = type;
+    res->result = result;
+    res->type = alloc_type;
+
+    return res;
+}
 
 /**
  * ======================================================================================================
@@ -107,8 +143,8 @@ bool tabla_jobs_get_id(TablaJobs *t, int job_id) {
  * Busca el conn original asociado a un job_id, sin importar el bucket.
  * Devuelve NULL si no se encuentra.
  */
-connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
-    pthread_mutex_lock(&j->lock);
+connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id, bool take_lock) {
+    if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
     Job *curr = j->tabla_jobs[idx];
 
@@ -116,13 +152,25 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id) {
     while (curr != NULL) {
         if (curr->job_id == job_id) {
             connection_t *c = curr->conn;
-            pthread_mutex_unlock(&j->lock);
+            if (take_lock) pthread_mutex_unlock(&j->lock);
             return c;
         }
         curr = curr->sig;
     }
-    pthread_mutex_unlock(&j->lock);
+    if (take_lock) pthread_mutex_unlock(&j->lock);
     return NULL;
+}
+
+void tabla_jobs_insertar_job(TablaJobs *t, Job* j) {
+    unsigned idx = j->job_id % TAM_TABLA_JOBS;
+
+    if (t->tabla_jobs[idx] != NULL)
+        j->sig = t->tabla_jobs[idx];
+    else
+        j->sig = NULL;
+    
+    t->tabla_jobs[idx] = j;
+    return;
 }
 
 void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, char *buf, const char *g_ip, result_t r, bool take_lock) {
@@ -485,4 +533,75 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool 
 
     if (take_lock) pthread_mutex_unlock(&j->lock);
     return;
+}
+
+Job* tabla_jobs_buscar_por_id(TablaJobs* t, int job_id) {
+    unsigned idx = job_id % TAM_TABLA_JOBS;
+    Job* buscado = t->tabla_jobs[idx];
+
+    while (buscado != NULL) {
+        if (buscado->job_id == job_id)
+            return buscado;
+        buscado = buscado->sig;
+    }
+
+    return buscado;
+}
+
+bool job_confirmar(Job* job, char *ip, int job_id) {
+
+    if (job == NULL) return false;
+
+    OutRequest *sal = job->pendientes;
+    OutRequest *prev = NULL;
+
+    while (sal != NULL) {
+        if (strcmp(sal->ip, ip) == 0) {
+            if (prev == NULL)
+                job->pendientes = sal->next;
+            else
+                prev->next = sal->next;
+
+            // Crear nuevo Allocation
+
+            Allocation *nuevo = crear_allocation(sal->tipo, sal->amount, REMOTE, sal->ip, job_id, RM_GRANTED, sal->conn);
+
+            nuevo->sig = job->confirmadas;
+            job->confirmadas = nuevo;
+
+            free(sal);
+
+            return true;
+        }
+
+        prev = sal;
+        sal = sal->next;
+    }
+
+    return false;
+}
+
+Job* tabla_jobs_extract_by_id(TablaJobs *t, int job_id) {
+    unsigned int idx = job_id % TAM_TABLA_JOBS;
+
+    Job* prev = NULL;
+    Job* curr = t->tabla_jobs[idx];
+
+    while (curr != NULL) {
+        if (curr->job_id == job_id) {
+            if (prev == NULL)
+                t->tabla_jobs[idx] = curr->sig;
+            else
+                prev->sig = curr->sig;
+
+            // Agregar a la lista de extraídos
+            curr->sig = NULL;
+            return curr;
+        }
+        
+        prev = curr;
+        curr = curr->sig;
+    }
+
+    return NULL;
 }

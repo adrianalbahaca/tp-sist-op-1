@@ -58,7 +58,7 @@ connection_t* tabla_conns_lookup(TablaConns *tabla_conns, const char ip[]) {
     return NULL;
 }
 
-const char* tabla_conns_get_ip_by_conn(TablaConns *tabla_conns, connection_t *conn) {
+char* tabla_conns_get_ip_by_conn(TablaConns *tabla_conns, connection_t *conn) {
     pthread_mutex_lock(&tabla_conns->mutex);
 
     for (int i = 0; i < TAM_TABLA_CONN; i++) {

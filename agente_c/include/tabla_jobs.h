@@ -64,6 +64,10 @@ typedef struct {
     pthread_mutex_t lock; // Lock para la tabla completa
 } TablaJobs;
 
+OutRequest* crear_outrequest(char* ip, connection_t *conn, resource_t type, int amount, char *msg);
+
+Allocation* crear_allocation(resource_t type, int amount, alloc_type_t alloc_type, char *ip, int job_id, result_t result, connection_t *conn);
+
 /**
  * Inicialización de la tabla interna para el Resource Manager
  */
@@ -83,7 +87,9 @@ bool tabla_jobs_get_id(TablaJobs *t, int job_id);
  * Busca el conn original asociado a un job_id, sin importar el bucket.
  * Devuelve NULL si no se encuentra.
  */
-connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id);
+connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id, bool take_lock);
+
+void tabla_jobs_insertar_job(TablaJobs *t, Job* j);
 
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
@@ -126,6 +132,11 @@ Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 
 void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool take_lock);
 
+Job* tabla_jobs_buscar_por_id(TablaJobs* t, int job_id);
+
+bool job_confirmar(Job* job, char *ip, int job_id);
+
+Job* tabla_jobs_extract_by_id(TablaJobs *t, int job_id);
 
 /**
  * Se define la función necesaria de forma externa

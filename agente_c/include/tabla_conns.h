@@ -50,7 +50,7 @@ void tabla_conns_delete_by_conn(TablaConns *t, connection_t *conn);
 /**
  * Se retorna la dirección IP de una conexión externa ya completada
  */
-const char* tabla_conns_get_ip_by_conn(TablaConns *t, connection_t *conn);
+char* tabla_conns_get_ip_by_conn(TablaConns *t, connection_t *conn);
 
 /**
  * Destrucción de la tabla de conexiones externas
