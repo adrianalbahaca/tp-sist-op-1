@@ -1,5 +1,5 @@
 -module(c_agent_client).
--export([start/0, armar_lista/1, get_nodes/1]).
+-export([start/0, armar_lista/1, get_nodes/1, get_nodes_recv/1]).
 -export([masterloop/3, disparar_rafaga/4, armar_comando/1, job_handler/2, host_sort/1]).
 -export([test_deadlock1/0, test_deadlock2/0]).
 
@@ -8,6 +8,7 @@
 -define(GET_NODES, "GET_NODES\n").
 
 -define(RAFAGA, 3).
+-define(DIVISOR, 3).
 
 % Arma la lista de pares que luego se utilizará para armar el mapa del nodo correspondiente
 armar_lista(Node_listed) -> 
@@ -18,9 +19,9 @@ armar_lista(Node_listed) ->
         [First, Second | Tail] -> [{First, Second}] ++ armar_lista(Tail)
     end.
 
-% Similar a rand:uniform, pero desde 0 a N/3
-rand_desde_cero(0) -> 0;
-rand_desde_cero(N) -> 
+% Similar a rand:uniform, pero desde 0 a N/DIVISOR
+rand_recurso(0) -> 0;
+rand_recurso(N) -> 
     Max = max(1, N div 3), 
     rand:uniform(Max + 1) - 1.
 
@@ -32,13 +33,23 @@ host_sort(Maps_list) ->
     ).
 
 armar_comando(Maps_list) -> 
-    ListaOrdenada = lists:sort(
-        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
-        Maps_list
-    ),
-    armar_comando_ordenado(ListaOrdenada).
+    %N = length(Maps_list),
+    %Rand1 = rand:uniform(N - 1),
+    %Rand2 = Rand1 + 1,
+
+    %Lista = case N of
+    %            1 -> Maps_list;
+    %            _ ->  [lists:nth(Rand1, Maps_list)] ++ [lists:nth(Rand2, Maps_list)]
+    %        end,
+
+    %ListaOrdenada = lists:sort(
+    %    fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
+    %    Lista
+    %),
+
+    %armar_comando_ordenado(ListaOrdenada).
     
-    %armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
+    armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
 
 % Primera parte de "armar_comando"
 % Ordena la lista de nodos y arma el comando de JOB_REQUEST 
@@ -49,9 +60,9 @@ armar_comando_ordenado(Maps_list) ->
     case Maps_list of
         [] -> "";
         [Head | Tail] ->
-            Rand_list = [rand_desde_cero(list_to_integer(maps:get("cpu", Head, "0"))),
-                         rand_desde_cero(list_to_integer(maps:get("mem", Head, "0"))),
-                         rand_desde_cero(list_to_integer(maps:get("gpu", Head, "0")))],
+            Rand_list = [rand_recurso(list_to_integer(maps:get("cpu", Head, "0"))),
+                         rand_recurso(list_to_integer(maps:get("mem", Head, "0"))),
+                         rand_recurso(list_to_integer(maps:get("gpu", Head, "0")))],
 
             case Rand_list of
                 [0, 0, 0] -> "" ++ armar_comando_ordenado(Tail);
@@ -88,20 +99,24 @@ sleep(Ms) ->
 
 % Vigila el estado del job recibido como argumento
 job_handler(Job_id, _GrantsEsperados) ->
-        receive
-            granted ->
-                io:format("Job ~p trabajando...~n", [Job_id]),
-                sleep(1000 + rand:uniform(4000)),
-                io:format("Job ~p finalizó. Solicitando RELEASE...~n", [Job_id]),
-                master ! {release, Job_id};
-            denied ->
-                io:format("Job ~p DENEGADO. Abortando...~n", [Job_id]),
-                master ! {release, Job_id}
-            after 30000 ->
-                % Paso algo raro, demasiado tiempo esperando
-                io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
-                master ! {release, Job_id}
-        end.
+    io:format("Job ~p esperando asignación...~n", [Job_id]),
+    receive
+        granted ->
+            io:format("Job ~p trabajando...~n", [Job_id]),
+            sleep(1000 + rand:uniform(4000)),
+            io:format("Job ~p finalizó. Solicitando RELEASE...~n", [Job_id]),
+            master ! {release, Job_id};
+        denied ->
+            io:format("Job ~p DENEGADO. Abortando...~n", [Job_id]),
+            master ! {release, Job_id};
+        timeout ->
+            io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
+            master ! {release, Job_id}
+        after 30000 ->
+            % Paso algo raro, demasiado tiempo esperando
+            io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
+            master ! {release, Job_id}
+    end.
 
 % Dispara los 4 requests seguidos al socket en paralelo
 % También arma el map con los jobs pendientes
@@ -119,7 +134,6 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
                     Job_id = erlang:unique_integer([positive]), 
                     gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando ++ "\n"),
                     
-                    %io:format(user, "JOB_REQUEST ~p ~s~n", [Job_id, Comando]),
                     % Se calcula la cantidad de nodos (IPs) involucrados contando el delimitador '@'
                     % Tokens = string:split(string:trim(Comando), "@", all),
                     % GrantsEsperados = length(Tokens) - 1,
@@ -139,8 +153,9 @@ registrar_log(JobId, Estado, Detalle) ->
 
 get_nodes(Socket) ->
     gen_tcp:send(Socket, ?GET_NODES),
-    %io:format("Mensaje enviado: ~s", [?GET_NODES]),
-    
+    get_nodes_recv(Socket).
+
+get_nodes_recv(Socket) ->
     case gen_tcp:recv(Socket, 0, 5000) of
         {ok, "NODES " ++ Data} ->
             Data_listed = string:split(string:trim(Data), ";", all), 
@@ -154,6 +169,8 @@ get_nodes(Socket) ->
             ],
             
             ListDeMapas;
+
+        %{ok, _} -> get_nodes_recv(Socket);
 
         {error, Reason} ->
             io:format("Error: No se pudo recibir la información sobre los nodos: ~p ~n", [Reason]),
@@ -191,7 +208,6 @@ masterloop(Maps_list, Socket, HandlersMap) ->
             masterloop(NuevoMapsList, Socket, CleanMapInterno)
     after 0 -> 
         % Si no hay liberaciones internas, escuchamos lo que llega de la red (Agente C)
-        %io:format("ESPERANDO~n"),
         case gen_tcp:recv(Socket, 0, 5000) of
             {ok, LineaConSalto} ->
                 % Removemos el \n de la línea
@@ -245,9 +261,10 @@ start() ->
             register(master, self()),
     
             % Arrancamos el masterloop con un mapa de jobs pendientes
-            % Y uno de nodos, ambos vacíos #{}
+            % Y uno de nodos, ambos vacíos
             io:format("Entrando a masterloop...~n"),
             masterloop([], Socket, #{}),
+            io:format("Terminé~n"), %
             gen_tcp:close(Socket);
             
             
