@@ -141,12 +141,14 @@ connection_t *connect_remote_node(int epfd, const char *ip, int port) {
         return NULL;
     }
 
+    pthread_mutex_init(&conn->write_mutex, NULL);
+    pthread_mutex_lock(&conn->write_mutex);
     conn->fd = sockfd;
     conn->type = CONN_TCP_OUTGOING;
     conn->read_pos = 0;
-    pthread_mutex_init(&conn->write_mutex, NULL);
     conn->write_pos = 0;
     conn->write_len = 0;
+    pthread_mutex_unlock(&conn->write_mutex);
 
     struct epoll_event ev;
     /**
@@ -200,11 +202,16 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
      * esperando lecturas (EPOLLIN) para recibir los GRANTED/DENIED.
      */
     // Ahora la conexión existe
+    pthread_mutex_lock(&conn->write_mutex);
     conn->type = CONN_TCP_CLIENT_REMOTE; 
+    pthread_mutex_unlock(&conn->write_buf);
 
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLONESHOT;
     ev.data.ptr = conn;
+
+    // Hace lo que pensabas hacer en un inicio con tu nueva conexión
+    process_connection_ready(conn);
 
     // Actualiza el registro existente, diciendo que ahora escuche, solo le interesa cuando reciba algo
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
@@ -214,9 +221,6 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         free(conn);
         return;
     }
-
-    // Hace lo que pensabas hacer en un inicio con tu nueva conexión
-    process_connection_ready(conn);
 }
 
 /* Consume los datagramas pendientes */
@@ -390,6 +394,7 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
             ev.data.ptr = conn;
             if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
                 perror("epoll_ctl mod EAGAIN write");
+                process_disconnect(conn);
                 close(conn->fd);
                 pthread_mutex_unlock(&conn->write_mutex);
                 pthread_mutex_destroy(&conn->write_mutex);
@@ -401,6 +406,7 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
         } else {
             // Error de conexión (ej. EPIPE si el cliente cerró el socket prematuramente)
             perror("write error");
+            process_disconnect(conn);
             close(conn->fd);
             pthread_mutex_unlock(&conn->write_mutex);
             pthread_mutex_destroy(&conn->write_mutex);
@@ -433,6 +439,7 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
     ev.data.ptr = conn;
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod write update");
+        process_disconnect(conn);
         close(conn->fd);
         pthread_mutex_unlock(&conn->write_mutex);
         pthread_mutex_destroy(&conn->write_mutex);

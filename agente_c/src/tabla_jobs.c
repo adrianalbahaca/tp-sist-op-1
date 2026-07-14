@@ -197,9 +197,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             if (strcmp(g_ip, ip) == 0) {
                 // Es una inserción a la cabeza de una lista simplemente enlazada
                 Allocation *all = malloc(sizeof(Allocation));
-                if (all == NULL) {
-                    exit(EXIT_FAILURE);
-                }
+                assert(all != NULL);
                 all->amount = amount;
                 all->name = type;
                 all->type = LOCAL;
@@ -213,9 +211,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
             // Sino, se guarda en OutRequests
             else {
                 OutRequest *out = malloc(sizeof(OutRequest));
-                if (out == NULL) {
-                    exit(EXIT_FAILURE);
-                }
+                assert(out != NULL);
                 out->amount = amount;
                 out->conn = remoto;
                 out->tipo = type;
