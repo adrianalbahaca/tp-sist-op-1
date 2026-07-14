@@ -118,7 +118,7 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
                     Job_id = erlang:unique_integer([positive]), 
                     gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando ++ "\n"),
 
-                    Pid = spawn(?MODULE, job_handler, [Job_id, 1]),
+                    Pid = spawn(?MODULE, job_handler, [Job_id]),
                     NewMap = maps:put(Job_id, Pid, HandlersMap),
                     disparar_rafaga(Maps_list, Socket, Cantidad - 1, NewMap)
             end
