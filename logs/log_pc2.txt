@@ -1,0 +1,1299 @@
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 72 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 72
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 136 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 136
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 67 @10.0.0.1:mem:51 @10.0.0.2:mem:226 @10.0.0.3:mem:33 @10.0.0.4:mem:242
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 67 mem 242
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 67 mem 33
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 67 mem 51
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 67
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 67
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 67
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 67
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 131 @10.0.0.1:cpu:1:mem:94 @10.0.0.2:cpu:1:mem:237 @10.0.0.3:cpu:1:mem:42 @10.0.0.4:mem:474
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 131 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 131 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 131 mem 474
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 131
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 131
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 131
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 131
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 66 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 66
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 130 mem 25
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 130
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 69 mem 137
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 69
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 133 mem 138
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 133
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 72 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 131
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 131 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 131 mem 474
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 131 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 66 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 136 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 67
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 67 mem 51
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 67 mem 242
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 67 mem 33
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16084)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 323 @10.0.0.1:cpu:1:mem:82 @10.0.0.2:cpu:1:mem:79 @10.0.0.3:mem:223 @10.0.0.4:cpu:1:mem:220
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 323 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 323 mem 223
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 323 cpu 1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 323
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 323
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 387 @10.0.0.1:mem:49:gpu:1 @10.0.0.2:cpu:1:mem:156 @10.0.0.3:cpu:1:mem:114 @10.0.0.4:cpu:1:mem:404
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 387 mem 49
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 387 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 387 cpu 1
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 387
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 387
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 387
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 387
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 328 mem 185
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 328
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 392 mem 20
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 392
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 130 mem 25
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15904)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 69 mem 137
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16041)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 323
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 323
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 387
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 387 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 387 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 387 mem 49
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 258 mem 163
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 258
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 322 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 322
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 133 mem 138
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16016)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 323
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 323 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 323 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 323 mem 223
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 325 cpu 1
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 325
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 389 cpu 1
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 389
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 515 @10.0.0.1:cpu:1:mem:109:gpu:1 @10.0.0.2:mem:166 @10.0.0.3:cpu:1:mem:235 @10.0.0.4:mem:245
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 515 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 515 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 515 mem 245
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 515
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 515
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 579 @10.0.0.1:mem:13:gpu:1 @10.0.0.2:mem:202 @10.0.0.3:cpu:1:mem:238 @10.0.0.4:cpu:1:mem:336
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 579 mem 13
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 579 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 579 cpu 1
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 579
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 579
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 579
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 579
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 328 mem 185
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15833)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 392 mem 20
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15853)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 389 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 584 mem 134
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 584
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 648 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 648
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 579
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 579 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 579 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 579 mem 13
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15921)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 322 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 515
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 515
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 258 mem 163
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16084)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 514 mem 170
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 514
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 578 mem 244
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 578
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 584 mem 134
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15804)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 648 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 840 mem 73
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 840
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 904 mem 39
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 904
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 515
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 515 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 515 mem 245
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 515 cpu 1
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 325 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15858)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 578 mem 244
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16102)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 514 mem 170
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16272)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 581 mem 142
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 581
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 645 mem 152
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 645
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 771 @10.0.0.1:mem:25 @10.0.0.2:cpu:1:mem:4 @10.0.0.3:cpu:1:mem:281 @10.0.0.4:mem:39
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 771 mem 25
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 771 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 771 mem 39
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 771
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 771
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 771
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 771
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 835 @10.0.0.1:mem:15 @10.0.0.2:cpu:1:mem:146 @10.0.0.3:cpu:1:mem:249:gpu:1 @10.0.0.4:mem:344
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 835 mem 15
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 835 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 835 mem 344
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 835
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 835
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 835
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 835
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 770 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 770
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 834 mem 171
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 834
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 904 mem 39
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15846)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 840 mem 73
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15919)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 581 mem 142
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16061)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 645 mem 152
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16213)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1096 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 1096
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1160 cpu 1
+[QUEUE]: [job_id: 1160, amount: 1, type: REMOTE -> NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 835
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [job_id: 1160, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 835 cpu 1
+[QUEUE]: [job_id: 1160, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 835 mem 344
+[QUEUE]: [job_id: 1160, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 835 mem 15
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 1160 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 771
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 771 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 771 mem 39
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 771 mem 25
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 837 cpu 1
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 837
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 901 cpu 1
+[QUEUE]: [job_id: 901, amount: 1, type: REMOTE -> NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 963 @10.0.0.1:cpu:1:mem:44:gpu:1 @10.0.0.2:cpu:1:mem:201 @10.0.0.3:mem:332:gpu:1 @10.0.0.4:cpu:1:mem:192
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 963 cpu 1
+[QUEUE]: [job_id: 901, amount: 1, type: REMOTE ->job_id: 963, amount: 1, type: LOCAL -> NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 963 mem 332
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 963 cpu 1
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 963
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 963
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1027 @10.0.0.1:cpu:1:mem:108 @10.0.0.2:mem:6 @10.0.0.3:mem:289 @10.0.0.4:mem:493
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1027 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1027 mem 289
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1027 mem 493
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1027
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1027
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 770 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [job_id: 963, amount: 1, type: LOCAL -> NULL]
+[DEQUEUE] Job 901 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [job_id: 963, amount: 1, type: LOCAL -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 963
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 837 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 963 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 834 mem 171
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16378)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1160 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1096 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1026 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 1026
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1090 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 1090
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1352 cpu 1
+[QUEUE]: [job_id: 1352, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1416 cpu 1
+[QUEUE]: [job_id: 1352, amount: 1, type: REMOTE ->job_id: 1416, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 901 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [job_id: 1416, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 1352 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [job_id: 1416, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1027
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1027
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 963
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [job_id: 1416, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 963 cpu 1
+[QUEUE]: [job_id: 1416, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 963 cpu 1
+[QUEUE]: [job_id: 1416, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 963 mem 332
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 1416 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1093 cpu 1
+[QUEUE]: [job_id: 1093, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1157 mem 24
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 1157
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1027
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [job_id: 1093, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1027 cpu 1
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1416 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [job_id: 1093, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [[QUEUE]: [ NULL]
+[DEQUEUE] Job 1093 desencolado (tipo 0, amount 1, available_restante 0)
+ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1027 mem 493
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1027 mem 289
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1352 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16360)
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1026 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1157 mem 24
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16384)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1219 @10.0.0.1:mem:100 @10.0.0.2:mem:11 @10.0.0.3:mem:310:gpu:1 @10.0.0.4:mem:150
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1219 mem 100
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1219 mem 310
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1219 mem 150
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1219
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1219
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1219
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1219
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1283 @10.0.0.1:cpu:1:mem:38:gpu:1 @10.0.0.2:cpu:1:mem:208 @10.0.0.3:cpu:1:mem:72:gpu:1 @10.0.0.4:cpu:1:mem:504
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1283 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1283 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1283 cpu 1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1283
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1283
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1608 mem 22
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 1608
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1672 mem 244
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 1672
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1283
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1090 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1283
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1093 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1608 mem 22
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16129)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1282 mem 246
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 1282
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1346 mem 168
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 1346
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1349 mem 173
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 1349
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1413 mem 124
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 1413
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1219
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1219 mem 310
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1219 mem 100
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1219 mem 150
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15429)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1283
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1283 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1283 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1283 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1672 mem 244
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15673)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1864 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 1864
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 1928 mem 164
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 1928
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1411 @10.0.0.1:mem:45:gpu:1 @10.0.0.2:mem:61 @10.0.0.3:cpu:1:mem:224:gpu:1 @10.0.0.4:mem:144
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1411 mem 45
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1411 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1411 mem 144
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1411
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1411
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1411
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1411
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1475 @10.0.0.1:cpu:1:mem:127 @10.0.0.2:mem:220 @10.0.0.3:cpu:1:mem:104 @10.0.0.4:cpu:1:mem:372
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1475 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1475 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1475 cpu 1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1475
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1475
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1349 mem 173
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1282 mem 246
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15474)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15647)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1475
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1475
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1346 mem 168
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15815)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1538 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 1538
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1602 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 1602
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1864 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 1928 mem 164
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15979)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 2120 cpu 1
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 2120
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 2184 mem 139
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 2184
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1411
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1411 mem 144
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1411 mem 45
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1411 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15901)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1475
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1475 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1413 mem 124
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1475 cpu 1
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16025)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1475 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16245)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1602 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1538 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1667 @10.0.0.1:cpu:1:mem:76 @10.0.0.2:cpu:1:mem:226 @10.0.0.3:cpu:1:mem:17:gpu:1 @10.0.0.4:mem:128
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1667 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1667 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1667 mem 128
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1667
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1667
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1667
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1667
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1731 @10.0.0.1:mem:33:gpu:1 @10.0.0.2:cpu:1:mem:62 @10.0.0.3:cpu:1:mem:130:gpu:1 @10.0.0.4:mem:361
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1731 mem 33
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1731 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1731 mem 361
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1731
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1731
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1731
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1731
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1605 mem 37
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 1605
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1669 cpu 1
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 1669
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1794 cpu 1
+[QUEUE]: [job_id: 1794, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 1858 cpu 1
+[QUEUE]: [job_id: 1794, amount: 1, type: REMOTE ->job_id: 1858, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 2184 mem 139
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16347)
+[QUEUE]: [job_id: 1794, amount: 1, type: REMOTE ->job_id: 1858, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 2120 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [job_id: 1858, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 1794 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [job_id: 1858, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 2376 mem 185
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 2376
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 2440 cpu 1
+[QUEUE]: [job_id: 1858, amount: 1, type: REMOTE ->job_id: 2440, amount: 1, type: REMOTE -> NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1667
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [job_id: 1858, amount: 1, type: REMOTE ->job_id: 2440, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1667 cpu 1
+[QUEUE]: [job_id: 1858, amount: 1, type: REMOTE ->job_id: 2440, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1667 cpu 1
+[QUEUE]: [job_id: 1858, amount: 1, type: REMOTE ->job_id: 2440, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1667 mem 128
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [job_id: 2440, amount: 1, type: REMOTE -> NULL]
+[DEQUEUE] Job 1858 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [job_id: 2440, amount: 1, type: REMOTE -> NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1794 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 2440 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1731
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1731 mem 361
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1731 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1731 mem 33
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1605 mem 37
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16199)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1669 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1923 @10.0.0.1:cpu:1:mem:81:gpu:1 @10.0.0.2:cpu:1:mem:226 @10.0.0.3:mem:234:gpu:1 @10.0.0.4:mem:289
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1923 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1923 mem 234
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1923 mem 289
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1923
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1923
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 1987 @10.0.0.1:cpu:1:mem:123:gpu:1 @10.0.0.2:cpu:1:mem:193 @10.0.0.3:mem:108 @10.0.0.4:cpu:1:mem:109
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 1987 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 1987 mem 108
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 1987 cpu 1
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 1987
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 1987
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1861 mem 129
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 1861
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 1925 cpu 1
+[QUEUE]: [job_id: 1925, amount: 1, type: REMOTE -> NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 1858 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 2376 mem 185
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 1925 desencolado (tipo 0, amount 1, available_restante 0)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16255)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 2440 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=1)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1923
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1923
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 1987
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 1987
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2050 mem 134
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 2050
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2114 mem 2
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 2114
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 2632 mem 201
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 2632
+[RX] De AGENTE REMOTO (fd 8) -> RESERVE 2696 mem 256
+[TX] A AGENTE REMOTO (fd 8) -> GRANTED 2696
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1861 mem 129
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15791)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1923
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1923 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1923 mem 289
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1923 mem 234
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=2)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 1987
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 1987 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 1987 cpu 1
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 1987 mem 108
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=3)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 10.0.0.1:8000:cpu:2:mem:8192:gpu:1;10.0.0.2:8000:cpu:4:mem:16384:gpu:0;10.0.0.3:8000:cpu:6:mem:24576:gpu:1;10.0.0.4:8000:cpu:8:mem:32768:gpu:0
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2050 mem 134
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15925)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2179 @10.0.0.1:cpu:1:mem:21 @10.0.0.2:mem:34 @10.0.0.3:cpu:1:mem:30 @10.0.0.4:cpu:1:mem:446
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 2179 cpu 1
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 2179 cpu 1
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 2179 cpu 1
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 2179
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 2179
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 2243 @10.0.0.1:mem:114:gpu:1 @10.0.0.2:mem:236 @10.0.0.3:mem:28:gpu:1 @10.0.0.4:mem:195
+[LOCK-TABLA] intentando (JOB_REQUEST)
+[LOCK-TABLA] tomado (JOB_REQUEST)
+[TX] A AGENTE REMOTO (fd 9) -> RESERVE 2243 mem 114
+[TX] A AGENTE REMOTO (fd 10) -> RESERVE 2243 mem 28
+[TX] A AGENTE REMOTO (fd 11) -> RESERVE 2243 mem 195
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 2243
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 10) -> GRANTED 2243
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[RX] De AGENTE REMOTO (fd 11) -> GRANTED 2243
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 2243
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 1925 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2114 mem 2
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15657)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 2117 mem 187
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 2117
+[RX] De AGENTE REMOTO (fd 13) -> RESERVE 2181 mem 10
+[TX] A AGENTE REMOTO (fd 13) -> GRANTED 2181
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2306 cpu 1
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 2306
+[RX] De AGENTE REMOTO (fd 12) -> RESERVE 2370 mem 67
+[TX] A AGENTE REMOTO (fd 12) -> GRANTED 2370
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 2243
+[LOCK-TABLA] intentando (JOB_RELEASE)
+[LOCK-TABLA] tomado (JOB_RELEASE)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 2243 mem 195
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 2243 mem 28
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 2243 mem 114
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15629)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 2696 mem 256
+[QUEUE]: [[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15885)
+ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 9) -> GRANTED 2179
+[LOCK-TABLA] intentando (GRANTED_1)
+[LOCK-TABLA] tomado (GRANTED_1)
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 2179 cpu 0
+[TX] A AGENTE REMOTO (fd 11) -> RELEASE 2179 cpu 1
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 2179 mem 0
+[TX] A AGENTE REMOTO (fd 10) -> RELEASE 2179 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[TX] A AGENTE REMOTO (fd 9) -> RELEASE 2179 gpu 0
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=15919)
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2306 cpu 1
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 2117 mem 187
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16106)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 8) -> RELEASE 2632 mem 201
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16307)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 12) -> RELEASE 2370 mem 67
+[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16374)
+[QUEUE]: [ NULL]
+[RX] De AGENTE REMOTO (fd 13) -> RELEASE 2181 mem 10
+[QUEUE]: [[LOCK-TABLA] intentando (RELEASE_RESOURCE)
+[LOCK-TABLA] tomado (RELEASE_RESOURCE)
+ NULL]
+[QUEUE]: [ NULL]
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=16384)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
