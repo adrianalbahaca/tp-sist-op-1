@@ -2,6 +2,7 @@
 #include "pending_request.h"
 #include <stdbool.h>
 #include <stdio.h>
+#include <assert.h>
 
 char* type_to_str(origin_t origen) {
     switch(origen) {
@@ -108,6 +109,7 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
 bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount, origin_t origen) {
     
     PendingRequest* pending = malloc(sizeof(PendingRequest));
+    assert(pending != NULL);
     pending->job_id = job_id;
     pending->amount = amount;
     pending->owner_conn = conn;

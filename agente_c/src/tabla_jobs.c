@@ -180,6 +180,7 @@ void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t 
     // Si el Job no está allí, se crea un Job nuevo con una lista de Allocations vacía
     if (!buscar_job_tabla(j->tabla_jobs[idx], job_id)) {
         Job* job = malloc(sizeof(Job));
+        assert(job != NULL);
         job->conn = conn;
         job->job_id = job_id;
         job->confirmadas = NULL;
@@ -357,6 +358,7 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) 
             while (req != NULL) {
                 if (req->conn == conn) {
                     OutRequest *nuevo = malloc(sizeof(OutRequest));
+                    assert(nuevo != NULL);
                     nuevo->amount = req->amount;
                     nuevo->conn = req->conn;
                     strncpy(nuevo->ip, req->ip, sizeof(nuevo->ip) - 1);
@@ -410,6 +412,7 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
             
             // Crear nuevo Allocation
             Allocation *nuevo = malloc(sizeof(Allocation));
+            assert(nuevo != NULL);
             nuevo->amount = sal->amount;
             nuevo->name = sal->tipo;
             nuevo->type = REMOTE;

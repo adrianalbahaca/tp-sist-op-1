@@ -14,6 +14,7 @@
 #include <time.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <assert.h>
 
 // La cola de requests pendientes se implementará con una lista simplemente enlazad
 
@@ -497,6 +498,7 @@ void process_message(connection_t *conn, char *msg)
          */
 
         Job *nuevo_job = malloc(sizeof(Job));
+        assert(nuevo_job != NULL);
         nuevo_job->job_id = result.job_id;
         nuevo_job->conn = conn;
         nuevo_job->confirmadas = NULL;

@@ -26,6 +26,7 @@ void tabla_conns_insert(TablaConns *tabla_conns, char ip[], connection_t *conn) 
     unsigned int idx = hash_ip(ip);
 
     ConnEntry *c = malloc(sizeof(ConnEntry));
+    assert(c != NULL);
     c->conn = conn;
     strncpy(c->ip, ip, sizeof(c->ip) - 1);
     c->ip[sizeof(c->ip) - 1] = '\0';
