@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include <pthread.h>
+#include <stdatomic.h>
 
 #define MAX_EVENTS 64 // Límite superior de eventos del epoll para 1 única iteración (max efds)
 #define BUFF_SIZE 1024 // Tamaño máximo del buffer de cada mensaje a enviar
@@ -28,7 +29,8 @@ typedef enum {
 /* Encapsula el estado de una conexión y sus buffers. */
 typedef struct {
     int fd;
-    connection_type_t type;
+    _Atomic connection_type_t type;
+    _Atomic int refcount; // Contador de referencias atómico (C11)
     
     // Buffer para acumular lecturas parciales (soluciona el problema de EAGAIN)
     char read_buf[BUFF_SIZE];
@@ -76,5 +78,24 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg);
  * send_udp_broadcast(12529, "ANNOUNCE 192.168.1.10 8100 cpu:4 mem:8192 gpu:1\n")
  */
 void send_udp_broadcast(int port, const char *message);
+
+
+/*
+Evita que el server destruya la memoria de un socket que se desconectó mientras el 
+esource Manager todavía lo tiene guardado y está intentando enviarle datos
+*/
+
+/*
+Al guardar.
+Cada vez que almacenes el puntero connection_t * en alguna de tus estructuras de datos 
+para usarlo en el futuro.
+*/
+void connection_ref(connection_t *conn);
+/*
+Al descartar.
+Cada vez que elimines ese puntero de tus estructuras o destruyas la estructura que 
+lo contenía.
+*/
+void connection_unref(connection_t *conn);
 
 #endif /* __SERVER_H__ */

@@ -15,6 +15,21 @@
 
 #include <pthread.h>
 
+void connection_ref(connection_t *conn) {
+    if (conn) {
+        atomic_fetch_add(&conn->refcount, 1);
+    }
+}
+
+void connection_unref(connection_t *conn) {
+    if (conn) {
+        if (atomic_fetch_sub(&conn->refcount, 1) == 1) {
+            pthread_mutex_destroy(&conn->write_mutex);
+            free(conn);
+        }
+    }
+}
+
 /**
  * O_NONBLOCK para que retorne automáticamente y no se bloquee al hacer read, 
  * write o accept (EAGAIN o EWOULDBLOCK)
@@ -80,7 +95,8 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     }
 
     conn->fd = fd;
-    conn->type = type;
+    atomic_init(&conn->type, type);
+    atomic_init(&conn->refcount, 1);
     conn->read_pos = 0;
     pthread_mutex_init(&conn->write_mutex, NULL);
     conn->write_pos = 0;
@@ -142,13 +158,14 @@ connection_t *connect_remote_node(int epfd, const char *ip, int port) {
     }
 
     pthread_mutex_init(&conn->write_mutex, NULL);
-    pthread_mutex_lock(&conn->write_mutex);
+    // pthread_mutex_lock(&conn->write_mutex); // ? borrar
     conn->fd = sockfd;
-    conn->type = CONN_TCP_OUTGOING;
+    atomic_init(&conn->type, CONN_TCP_OUTGOING);
+    atomic_init(&conn->refcount, 1);
     conn->read_pos = 0;
     conn->write_pos = 0;
     conn->write_len = 0;
-    pthread_mutex_unlock(&conn->write_mutex);
+    // pthread_mutex_unlock(&conn->write_mutex); // ? borrar
 
     struct epoll_event ev;
     /**
@@ -179,9 +196,9 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
     if (getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &socket_error, &errlen) < 0) {
         perror("getsockopt SO_ERROR");
         process_connection_failed(conn);
+        epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
         close(conn->fd);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
+        connection_unref(conn);
         return;
     }
     
@@ -190,9 +207,9 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         fprintf(stderr, "Fallo al conectar nodo remoto: %s\n", strerror(socket_error));
         // Aborta misión, descarta los paquetes
         process_connection_failed(conn);
+        epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
         close(conn->fd);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
+        connection_unref(conn);
         return;
     }
 
@@ -202,23 +219,32 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
      * esperando lecturas (EPOLLIN) para recibir los GRANTED/DENIED.
      */
     // Ahora la conexión existe
+    /*
     pthread_mutex_lock(&conn->write_mutex);
     conn->type = CONN_TCP_CLIENT_REMOTE; 
-    pthread_mutex_unlock(&conn->write_buf);
-
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLONESHOT;
-    ev.data.ptr = conn;
+    pthread_mutex_unlock(&conn->write_mutex);
+    */
+    atomic_store(&conn->type, CONN_TCP_CLIENT_REMOTE);
 
     // Hace lo que pensabas hacer en un inicio con tu nueva conexión
     process_connection_ready(conn);
+    
+    pthread_mutex_lock(&conn->write_mutex);
+    struct epoll_event ev;
+    if (conn->write_len > 0) {
+        ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+    } else {
+        ev.events = EPOLLIN | EPOLLONESHOT;
+    }
+    ev.data.ptr = conn;
+
 
     // Actualiza el registro existente, diciendo que ahora escuche, solo le interesa cuando reciba algo
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod connection success");
+        epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
         close(conn->fd);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
+        connection_unref(conn);
         return;
     }
 }
@@ -266,9 +292,9 @@ static void handle_udp_read(connection_t *conn) {
 
 /* Lee los datos de la conexión TCP */
 static int handle_tcp_read(int epfd, connection_t *conn) {
-    pthread_mutex_lock(&conn->write_mutex);
+    // pthread_mutex_lock(&conn->write_mutex); // ? Borrar, es EXCLUSIVO
     int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
-    pthread_mutex_unlock(&conn->write_mutex);
+    // pthread_mutex_unlock(&conn->write_mutex); // ? Borrar, es EXCLUSIVO
 
     if (bytes_read < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -285,9 +311,9 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
                 perror("epoll_ctl mod EAGAIN");
                 pthread_mutex_unlock(&conn->write_mutex);
                 process_disconnect(conn);
+                epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
                 close(conn->fd);
-                pthread_mutex_destroy(&conn->write_mutex);
-                free(conn);
+                connection_unref(conn);
                 return -1;
             }
             pthread_mutex_unlock(&conn->write_mutex);
@@ -295,10 +321,12 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
         } else {
             // Error real de E/S
             perror("read error");
+            /*
             process_disconnect(conn);
+            epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
             close(conn->fd);
-            pthread_mutex_destroy(&conn->write_mutex);
-            free(conn);
+            connection_unref(conn);
+            */
             return -1;
         }
     }
@@ -306,10 +334,12 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
     if (bytes_read == 0) {
         /* EOF: El extremo remoto cerró la conexión de manera ordenada */
         // NOTIFICACIÓN ANTES DE DESTRUIR
+        /*
         process_disconnect(conn);
+        epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
         close(conn->fd);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
+        connection_unref(conn);
+        */
         return -1;
     }
 
@@ -358,10 +388,12 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod rearm");
         pthread_mutex_unlock(&conn->write_mutex);
+        /*
         process_disconnect(conn);
+        epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
         close(conn->fd);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
+        connection_unref(conn);
+        */
         return -1;
     }
     pthread_mutex_unlock(&conn->write_mutex);
@@ -369,7 +401,7 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
 }
 
 /* Transmitir los datos por la red */
-static void handle_tcp_write(int epfd, connection_t *conn) {
+static int handle_tcp_write(int epfd, connection_t *conn) {
     pthread_mutex_lock(&conn->write_mutex);
     // Calcula los bytes restantes por enviar
     size_t pending_bytes = conn->write_len - conn->write_pos;
@@ -379,7 +411,7 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
         struct epoll_event ev = { .events = EPOLLIN | EPOLLONESHOT, .data.ptr = conn };
         epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev);
         pthread_mutex_unlock(&conn->write_mutex);
-        return;
+        return 0;
     }
     ssize_t bytes_written = write(conn->fd, conn->write_buf + conn->write_pos, pending_bytes);
 
@@ -395,23 +427,23 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
             if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
                 perror("epoll_ctl mod EAGAIN write");
                 process_disconnect(conn);
+                epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
                 close(conn->fd);
                 pthread_mutex_unlock(&conn->write_mutex);
-                pthread_mutex_destroy(&conn->write_mutex);
-                free(conn);
-                return;
+                connection_unref(conn);
+                return -1;
             }
             pthread_mutex_unlock(&conn->write_mutex);
-            return;
+            return 0;
         } else {
             // Error de conexión (ej. EPIPE si el cliente cerró el socket prematuramente)
             perror("write error");
             process_disconnect(conn);
+            epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
             close(conn->fd);
             pthread_mutex_unlock(&conn->write_mutex);
-            pthread_mutex_destroy(&conn->write_mutex);
-            free(conn);
-            return;
+            connection_unref(conn);
+            return -1;
         }
     }
 
@@ -440,12 +472,14 @@ static void handle_tcp_write(int epfd, connection_t *conn) {
     if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
         perror("epoll_ctl mod write update");
         process_disconnect(conn);
+        epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
         close(conn->fd);
         pthread_mutex_unlock(&conn->write_mutex);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
+        connection_unref(conn);
+        return -1;
     }
     pthread_mutex_unlock(&conn->write_mutex);
+    return 0;
 }
 
 /* Acepta todas las conexiones TCP entrantes en los listen sockets*/
@@ -483,12 +517,13 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
         pthread_mutex_init(&new_conn->write_mutex, NULL);
         new_conn->write_pos = 0;
         new_conn->write_len = 0;
+        atomic_init(&new_conn->refcount, 1);
 
         // Derivación del tipo de conexión según el socket de origen
-        if (listen_conn->type == CONN_TCP_PUBLIC_LISTEN) {
-            new_conn->type = CONN_TCP_CLIENT_REMOTE;
-        } else if (listen_conn->type == CONN_TCP_LOCAL_LISTEN) {
-            new_conn->type = CONN_TCP_CLIENT_LOCAL;
+        if (atomic_load(&listen_conn->type) == CONN_TCP_PUBLIC_LISTEN) {
+            atomic_init(&new_conn->type, CONN_TCP_CLIENT_REMOTE);
+        } else {
+            atomic_init(&new_conn->type, CONN_TCP_CLIENT_LOCAL);
         }
 
         struct epoll_event ev;
@@ -502,8 +537,7 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
         if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
             perror("epoll_ctl add client");
             close(client_fd);
-            pthread_mutex_destroy(&new_conn->write_mutex);
-            free(new_conn);
+            connection_unref(new_conn);
         }
     }
 }
@@ -529,56 +563,57 @@ void* worker_thread_loop(void* arg) {
             connection_t *conn = (connection_t *)events[i].data.ptr;
             int connection_closed = 0;
 
-            // Tratamiento de errores en el socket (cierre abrupto, reset)
+            // 1. Detección de errores a nivel SO
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & (EPOLLIN | EPOLLOUT)))) {
                 fprintf(stderr, "Error en el socket %d\n", conn->fd);
-                // NOTIFICACIÓN ANTES DE DESTRUIR
-                process_disconnect(conn);
-                close(conn->fd);
-                pthread_mutex_destroy(&conn->write_mutex);
-                free(conn);
-                continue;
-            }
+                connection_closed = 1;
+            } else {
+                connection_type_t conn_type = atomic_load(&conn->type);
 
-            // Evento de lectura disponible
-            if (events[i].events & EPOLLIN) {
-                switch (conn->type) {
-                    case CONN_TCP_PUBLIC_LISTEN:
-                    case CONN_TCP_LOCAL_LISTEN:
-                        // Nuevas conexiones entrantes
-                        handle_accept(epfd, conn);
-                        break;
-                        
-                    case CONN_UDP_DISCOVERY:
-                        // Paquetes de descubrimiento de otros nodos
-                        handle_udp_read(conn);
-                        break;
-                        
-                    case CONN_TCP_CLIENT_REMOTE:
-                    case CONN_TCP_CLIENT_LOCAL:
-                    case CONN_TCP_OUTGOING:
-                        if (handle_tcp_read(epfd, conn) == -1) {
+                // 2. Lectura
+                if (events[i].events & EPOLLIN) {
+                    switch (conn_type) {
+                        case CONN_TCP_PUBLIC_LISTEN:
+                        case CONN_TCP_LOCAL_LISTEN:
+                            handle_accept(epfd, conn);
+                            break;
+                        case CONN_UDP_DISCOVERY:
+                            handle_udp_read(conn);
+                            break;
+                        case CONN_TCP_CLIENT_REMOTE:
+                        case CONN_TCP_CLIENT_LOCAL:
+                        case CONN_TCP_OUTGOING:
+                            if (handle_tcp_read(epfd, conn) == -1) {
+                                connection_closed = 1;
+                            }
+                            break;
+                    }
+                }
+
+                // 3. Escritura (si no se cerró durante la lectura)
+                if (!connection_closed && (events[i].events & EPOLLOUT)) {
+                    switch (conn_type) {
+                        case CONN_TCP_CLIENT_REMOTE:
+                        case CONN_TCP_CLIENT_LOCAL:
+                        if (handle_tcp_write(epfd, conn) == -1) {
                             connection_closed = 1;
                         }
-                        break;
+                            break;
+                        case CONN_TCP_OUTGOING:
+                            handle_outgoing_connection_event(epfd, conn);
+                            break;
+                        default:
+                            break;
+                    }
                 }
             }
 
-            // Evento de escritura disponible (el buffer del socket del OS tiene espacio)
-            if (!connection_closed && events[i].events & EPOLLOUT) {
-                switch (conn->type) {
-                    case CONN_TCP_CLIENT_REMOTE:
-                    case CONN_TCP_CLIENT_LOCAL:
-                        handle_tcp_write(epfd, conn);
-                        break;
-
-                    case CONN_TCP_OUTGOING:
-                        handle_outgoing_connection_event(epfd, conn);
-                        break;
-
-                    default:
-                        break;
-                }
+            // 4. ÚNICO PUNTO DE DESTRUCCIÓN DE RED
+            if (connection_closed) {
+                process_disconnect(conn);
+                epoll_ctl(epfd, EPOLL_CTL_DEL, conn->fd, NULL);
+                close(conn->fd);
+                connection_unref(conn);
             }
         }
     }
