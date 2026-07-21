@@ -35,7 +35,7 @@ typedef enum
     DEST_AGENTE_REMOTO
 } dest_t; // enum que determina el destino de un mensaje
 
-// Al principio de resource_manager.c, después de los #include
+// Al principio de resource_manager.c, después de los #include, para el compilador
 static void send_message(connection_t *conn, int epfd, dest_t dest, const char *fmt, ...)
     __attribute__((format(printf, 4, 5)));
 
@@ -181,10 +181,15 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
 
     if (take_lock) pthread_mutex_lock(&manager.tabla.lock);
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
+    
     if (manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
         manager.recursos[tipo].available_amount += amount;
-    else
-        printf("[!] Se hizo un release inválido!. Se ignora silenciosamente\n");
+        
+    else {
+        fprintf(stderr, "[!] Se hizo un release inválido!. Se ignora silenciosamente\n");
+        pthread_mutex_unlock(&manager.tabla.lock);
+        return;
+    }
 
     ColaPendingRequest *cola = &manager.recursos[tipo].cola;
 
