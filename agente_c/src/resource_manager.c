@@ -184,12 +184,9 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
 
     if (manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
         manager.recursos[tipo].available_amount += amount;
-        
-    else {
-        fprintf(stderr, "[!] Se hizo un release inválido!. Se ignora silenciosamente\n");
-        pthread_mutex_unlock(&manager.tabla.lock);
-        return;
-    }
+    else
+        manager.recursos[tipo].available_amount = manager.recursos[tipo].total_amount;
+
 
     ColaPendingRequest *cola = &manager.recursos[tipo].cola;
 
