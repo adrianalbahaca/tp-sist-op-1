@@ -92,7 +92,7 @@ void manager_set_ip(const char *ip)
 }
 
 // Elimina los jobs asociados al Job_id dado de las colas
-void limpiar_colas(int job_id)
+void limpiar_colas_por_id(int job_id)
 {
     pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
     queue_delete_by_job_id(&manager.recursos[RESOURCE_CPU].cola, job_id);
@@ -104,6 +104,24 @@ void limpiar_colas(int job_id)
 
     pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
     queue_delete_by_job_id(&manager.recursos[RESOURCE_GPU].cola, job_id);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+
+    return;
+}
+
+void limpiar_colas_por_conn(connection_t* conn) {
+
+    // Primero, para cada uno de los recursos, es necesario liberarlo de la cola
+    pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
+    queue_delete_by_conn(&manager.recursos[RESOURCE_CPU].cola, conn);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
+
+    pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
+    queue_delete_by_conn(&manager.recursos[RESOURCE_MEM].cola, conn);
+    pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
+
+    pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
+    queue_delete_by_conn(&manager.recursos[RESOURCE_GPU].cola, conn);
     pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
 
     return;
@@ -159,11 +177,14 @@ static result_t reserve_resource(resource_t tipo, int amount, int job_id, connec
 }
 
 // Atiende una orden RELEASE, liberando la memoria y la cola acorde
-void release_resource(resource_t tipo, int amount, bool take_lock){
+void release_resource(resource_t tipo, int amount, bool take_lock) {
 
     if (take_lock) pthread_mutex_lock(&manager.tabla.lock);
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
-    manager.recursos[tipo].available_amount += amount;
+    if (manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
+        manager.recursos[tipo].available_amount += amount;
+    else
+        printf("[!] Se hizo un release inválido!. Se ignora silenciosamente\n");
 
     ColaPendingRequest *cola = &manager.recursos[tipo].cola;
 
@@ -177,7 +198,6 @@ void release_resource(resource_t tipo, int amount, bool take_lock){
                tipo, cola->top->job_id, cola->top->amount, manager.recursos[tipo].available_amount);
     }
 
-    char msg[BUFF_SIZE];
     // Desencolamos los trabajos que ahora pueden satisfacerse
     while (!queue_is_empty(cola) && manager.recursos[tipo].available_amount >= cola->top->amount)
     {
@@ -191,13 +211,11 @@ void release_resource(resource_t tipo, int amount, bool take_lock){
 
         if (pending->origen == ORIGIN_REMOTE)
         {
-            snprintf(msg, sizeof(msg), "GRANTED %d\n", pending->job_id);
-            enqueue_write(g_epfd, pending->owner_conn, msg);
+            send_message(pending->owner_conn, g_epfd, DEST_AGENTE_REMOTO, "GRANTED %d\n", pending->job_id);
         }
         else if (pending->origen == ORIGIN_LOCAL && tabla_jobs_verificar(&manager.tabla, pending->job_id, false))
         {
-            snprintf(msg, sizeof(msg), "JOB_GRANTED %d\n", pending->job_id);
-            enqueue_write(g_epfd, pending->owner_conn, msg);
+            send_message(pending->owner_conn, g_epfd, DEST_AGENTE_REMOTO, "JOB_GRANTED %d\n", pending->job_id);
         }
 
         // Liberar el recurso dado
@@ -282,17 +300,11 @@ void process_message(connection_t *conn, char *msg)
             result_t r = reserve_resource(result.type, result.amount, result.job_id, conn, ORIGIN_REMOTE);
             if (r == RM_DENIED)
             {
-                char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "DENIED %d\n", result.job_id);
-                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
-                enqueue_write(g_epfd, conn, buf);
+                send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "DENIED %d\n", result.job_id);
             }
             else if (r == RM_GRANTED)
             {
-                char buf[BUFF_SIZE];
-                snprintf(buf, sizeof(buf), "GRANTED %d\n", result.job_id);
-                printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, buf);
-                enqueue_write(g_epfd, conn, buf);
+                send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "GRANTED %d\n", result.job_id);
             }
         }
         else
@@ -315,7 +327,7 @@ void process_message(connection_t *conn, char *msg)
             tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true, true);
 
             // PURGA DE FANTASMAS
-            limpiar_colas(result.job_id);
+            limpiar_colas_por_id(result.job_id);
         }
         else
         {
@@ -387,7 +399,7 @@ void process_message(connection_t *conn, char *msg)
                 send_message(owner, g_epfd, DEST_ERLANG_LOCAL, "JOB_DENIED %d\n", result.job_id);
             }
 
-            limpiar_colas(result.job_id);
+            limpiar_colas_por_id(result.job_id);
             pthread_mutex_unlock(&manager.tabla.lock);
         }
         
@@ -420,6 +432,7 @@ void process_message(connection_t *conn, char *msg)
 
         // Crea un nuevo Job
         Job *nuevo_job = malloc(sizeof(Job));
+        assert(nuevo_job != NULL);
         nuevo_job->job_id = result.job_id;
         nuevo_job->conn = conn;
         nuevo_job->confirmadas = NULL;
@@ -448,7 +461,7 @@ void process_message(connection_t *conn, char *msg)
                 else if (r == RM_DENIED)
                 {
 
-                    limpiar_colas(result.job_id);
+                    limpiar_colas_por_id(result.job_id);
 
                     // Destruir el Job
                     Allocation *allocs = nuevo_job->confirmadas;
@@ -515,7 +528,7 @@ void process_message(connection_t *conn, char *msg)
 
                     if (intento == NULL){
                         // Parar todo
-                        limpiar_colas(result.job_id);
+                        limpiar_colas_por_id(result.job_id);
 
                         // Borrar Job
                         // Destruir el Job
@@ -574,6 +587,9 @@ void process_message(connection_t *conn, char *msg)
 
         resource_list_destroy(result.request_list);
         tabla_jobs_insertar_job(&manager.tabla, nuevo_job);
+
+        if (tabla_jobs_verificar(&manager.tabla, result.job_id, false))
+            send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_GRANTED %d\n", result.job_id);
         pthread_mutex_unlock(&manager.tabla.lock);
     }
     /**
@@ -651,7 +667,7 @@ void process_message(connection_t *conn, char *msg)
                 if (alloc->type == LOCAL && alloc->result == RM_GRANTED)
                     release_resource(alloc->name, alloc->amount, true);
                 else
-                    limpiar_colas(alloc->job_id);
+                    limpiar_colas_por_id(alloc->job_id);
 
                 if (alloc->type == REMOTE)
                 {
@@ -672,7 +688,7 @@ void process_message(connection_t *conn, char *msg)
 
             free(eliminar_job);
 
-            limpiar_colas(result.job_id);
+            limpiar_colas_por_id(result.job_id);
         }
 
         else{
@@ -713,7 +729,7 @@ void process_message(connection_t *conn, char *msg)
         {
             tabla_jobs_remove(&manager.tabla, result.job_id, &conns, g_epfd, true, true);
 
-            limpiar_colas(result.job_id);
+            limpiar_colas_por_id(result.job_id);
         }
     }
     /**
@@ -746,18 +762,8 @@ void process_announce(const char *ip_sender, const char *message)
  */
 void process_disconnect(connection_t *conn)
 {
-    // Primero, para cada uno de los recursos, es necesario liberarlo de la cola
-    pthread_mutex_lock(&manager.recursos[RESOURCE_CPU].mutex);
-    queue_delete_by_conn(&manager.recursos[RESOURCE_CPU].cola, conn);
-    pthread_mutex_unlock(&manager.recursos[RESOURCE_CPU].mutex);
-
-    pthread_mutex_lock(&manager.recursos[RESOURCE_MEM].mutex);
-    queue_delete_by_conn(&manager.recursos[RESOURCE_MEM].cola, conn);
-    pthread_mutex_unlock(&manager.recursos[RESOURCE_MEM].mutex);
-
-    pthread_mutex_lock(&manager.recursos[RESOURCE_GPU].mutex);
-    queue_delete_by_conn(&manager.recursos[RESOURCE_GPU].cola, conn);
-    pthread_mutex_unlock(&manager.recursos[RESOURCE_GPU].mutex);
+    // Primero, se limpia las colas de los jobs con tal conexión asociada
+    limpiar_colas_por_conn(conn);
 
     // Luego, para la tabla de jobs, es necesario eliminarlos de la tabla de Jobs
     Allocation *lista = tabla_jobs_delete_by_conn(&manager.tabla, conn);
@@ -798,10 +804,11 @@ void process_connection_ready(connection_t *conn){
     while (lista != NULL)
     {
         tabla_conns_insert(&conns, lista->ip, conn);
-        printf("[TX] A AGENTE REMOTO (fd %d) -> %s", conn->fd, lista->msg);
-        enqueue_write(g_epfd, conn, lista->msg);
+        send_message(conn, g_epfd, DEST_AGENTE_REMOTO, lista->msg);
+
         OutRequest *next = lista->next;
         free(lista);
+
         lista = next;
     }
     pthread_mutex_unlock(&manager.tabla.lock);
@@ -819,7 +826,7 @@ void process_connection_failed(connection_t *conn){
     {
         Job *sig = lista->sig;
 
-        limpiar_colas(lista->job_id);
+        limpiar_colas_por_id(lista->job_id);
 
         Allocation *all = lista->confirmadas;
         while (all != NULL)
