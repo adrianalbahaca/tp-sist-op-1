@@ -310,15 +310,7 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) 
             while (req != NULL) {
                 if (req->conn == conn) {
                     // Crea un OutRequest
-                    OutRequest *nuevo = malloc(sizeof(OutRequest));
-                    nuevo->amount = req->amount;
-                    nuevo->conn = req->conn;
-                    strncpy(nuevo->ip, req->ip, sizeof(nuevo->ip) - 1);
-                    nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
-                    strncpy(nuevo->msg, req->msg, sizeof(nuevo->msg) - 1);
-                    nuevo->msg[sizeof(nuevo->msg) - 1] = '\0';
-                    nuevo->tipo = req->tipo;
-
+                    OutRequest *nuevo = crear_outrequest(req->ip, req->conn, req->tipo, req->amount, req->msg);
                     nuevo->next = lista;
                     lista = nuevo;
                 }
@@ -359,14 +351,7 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
                 prev->next = sal->next;
             
             // Crear nuevo Allocation
-            Allocation *nuevo = malloc(sizeof(Allocation));
-            nuevo->amount = sal->amount;
-            nuevo->name = sal->tipo;
-            nuevo->type = REMOTE;
-            nuevo->result = RM_GRANTED;
-            strncpy(nuevo->ip, sal->ip, sizeof(nuevo->ip) - 1);
-            nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
-            nuevo->job_id = job_id;
+            Allocation *nuevo = crear_allocation(sal->tipo, sal->amount, REMOTE, sal->ip, job_id, RM_GRANTED, sal->conn);
 
             nuevo->sig = curr->confirmadas;
             curr->confirmadas = nuevo;
