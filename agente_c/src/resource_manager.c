@@ -181,7 +181,7 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
 
     if (take_lock) pthread_mutex_lock(&manager.tabla.lock);
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
-    
+
     if (manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
         manager.recursos[tipo].available_amount += amount;
         
@@ -635,8 +635,7 @@ void process_message(connection_t *conn, char *msg)
         else
             strcat(buf, "\n");
 
-        printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
-        enqueue_write(g_epfd, conn, buf);
+        send_message(conn, g_epfd, DEST_ERLANG_LOCAL, buf);
     }
     /**
      * ANNOUNCE
@@ -659,6 +658,7 @@ void process_message(connection_t *conn, char *msg)
             Job *eliminar_job = tabla_jobs_extract_by_id(&manager.tabla, result.job_id);
 
             if (eliminar_job == NULL){
+                fprintf(stderr, "[!] JOB_RELEASE que no existe o que fue previamente liberado!. Se ignora silenciosamente");
                 pthread_mutex_unlock(&manager.tabla.lock);
                 return;
             }
@@ -710,17 +710,14 @@ void process_message(connection_t *conn, char *msg)
         job_status_msg_t result = parse_job_status(msg);
         if (result.valido)
         {
-            char buf[BUFF_SIZE];
             if (tabla_jobs_get_conn(&manager.tabla, result.job_id, true) != NULL)
             {
-                snprintf(buf, sizeof(buf), "JOB_STATUS %d ACTIVE\n", result.job_id);
+                send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_STATUS %d ACTIVE\n", result.job_id);
             }
             else
             {
-                snprintf(buf, sizeof(buf), "JOB_STATUS %d UNKNOWN\n", result.job_id);
+                send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_STATUS %d UNKNOWN\n", result.job_id);
             }
-            printf("[TX] A ERLANG LOCAL (fd %d) -> %s", conn->fd, buf);
-            enqueue_write(g_epfd, conn, buf);
         }
         else
         {

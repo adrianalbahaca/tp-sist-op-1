@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "tabla_node_entry.h"
 
 // Definición de la tabla de nodos externa en el Resource Manager

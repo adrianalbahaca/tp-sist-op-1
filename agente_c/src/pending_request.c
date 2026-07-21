@@ -2,6 +2,7 @@
 #include "pending_request.h"
 #include <stdbool.h>
 #include <stdio.h>
+#include <assert.h>
 
 // Convierte el origin_t al string correspondiente
 char* type_to_str(origin_t origen) {
