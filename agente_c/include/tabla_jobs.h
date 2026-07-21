@@ -89,12 +89,10 @@ bool tabla_jobs_get_id(TablaJobs *t, int job_id);
  */
 connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id, bool take_lock);
 
-void tabla_jobs_insertar_job(TablaJobs *t, Job* j);
-
 /**
  * Inserta un nuevo Job con el Allocation, o actualiza el Job con un nuevo Allocation
  */
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t* remote, char *msg, const char *g_ip, result_t r, bool take_lock);
+void tabla_jobs_insertar_job(TablaJobs *t, Job* j);
 
 /**
  * Remover un Job de la tabla de Jobs, ya sea porque ya se solicitó todos los requests o por una desconexión
@@ -130,7 +128,7 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn);
  */
 Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn);
 
-void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool take_lock);
+void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, resource_t tipo, bool take_lock);
 
 Job* tabla_jobs_buscar_por_id(TablaJobs* t, int job_id);
 

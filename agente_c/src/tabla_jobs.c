@@ -11,6 +11,8 @@
  * Funciones de Jobs
  * ======================================================================================================
  */
+
+// Crea la estructura OutRequest
 OutRequest* crear_outrequest(char* ip, connection_t *conn, resource_t type, int amount, char *msg) {
     OutRequest *result = malloc(sizeof(OutRequest));
     assert(result != NULL);
@@ -25,6 +27,7 @@ OutRequest* crear_outrequest(char* ip, connection_t *conn, resource_t type, int 
     return result;
 }
 
+// Crea la estructura Allocation
 Allocation* crear_allocation(resource_t type, int amount, alloc_type_t alloc_type, char *ip, int job_id, result_t result, connection_t *conn) {
     Allocation *res = malloc(sizeof(Allocation));
     assert(res != NULL);
@@ -47,6 +50,7 @@ Allocation* crear_allocation(resource_t type, int amount, alloc_type_t alloc_typ
  * ======================================================================================================
  */
 
+// Busca el job en la tabla
 bool buscar_job_tabla(Job *j, int job_id)
 {
     Job *curr = j;
@@ -59,6 +63,7 @@ bool buscar_job_tabla(Job *j, int job_id)
     return false;
 }
 
+// Convierte el resource_t en el string correspondiente
 static char *resource_type_to_str(resource_t type)
 {
     switch (type)
@@ -80,12 +85,14 @@ static char *resource_type_to_str(resource_t type)
 
 // ======================================================================================================
 
+// Inicializa la tabla de jobs
 void tabla_jobs_init(TablaJobs *j) {
     memset(j->tabla_jobs, 0, sizeof(j->tabla_jobs));
     pthread_mutex_init(&j->lock, NULL);
     return;
 }
 
+// Destruye la tabla de jobs
 void tabla_jobs_destroy(TablaJobs *j) {
     pthread_mutex_lock(&j->lock);
     for (int i = 0; i < TAM_TABLA_JOBS; i++) {
@@ -122,6 +129,7 @@ void tabla_jobs_destroy(TablaJobs *j) {
     return;
 }
 
+// Determina si un job está en la tabla
 bool tabla_jobs_get_id(TablaJobs *t, int job_id) {
     pthread_mutex_lock(&t->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
@@ -161,6 +169,7 @@ connection_t* tabla_jobs_get_conn(TablaJobs *j, int job_id, bool take_lock) {
     return NULL;
 }
 
+// Inserta el job en la tabla
 void tabla_jobs_insertar_job(TablaJobs *t, Job* j) {
     unsigned idx = j->job_id % TAM_TABLA_JOBS;
 
@@ -171,63 +180,6 @@ void tabla_jobs_insertar_job(TablaJobs *t, Job* j) {
     
     t->tabla_jobs[idx] = j;
     return;
-}
-
-void tabla_jobs_insert(TablaJobs *j, connection_t *conn, int job_id, resource_t type, int amount, int max_amount, char* ip, connection_t *remoto, char *buf, const char *g_ip, result_t r, bool take_lock) {
-    if (take_lock) pthread_mutex_lock(&j->lock);
-    unsigned int idx = job_id % TAM_TABLA_JOBS;
-
-    // Si el Job no está allí, se crea un Job nuevo con una lista de Allocations vacía
-    if (!buscar_job_tabla(j->tabla_jobs[idx], job_id)) {
-        Job* job = malloc(sizeof(Job));
-        assert(job != NULL);
-        job->conn = conn;
-        job->job_id = job_id;
-        job->confirmadas = NULL;
-        job->pendientes = NULL;
-
-        job->sig = j->tabla_jobs[idx];
-        j->tabla_jobs[idx] = job;
-    }
-
-    // Sino, se busca el Job y se inserta en la lista adecuada
-    Job* curr = j->tabla_jobs[idx];
-    while (curr != NULL) {
-        if (curr->job_id == job_id) {
-            // Si viene del agente local, entonces guardar en Allocations
-            if (strcmp(g_ip, ip) == 0) {
-                // Es una inserción a la cabeza de una lista simplemente enlazada
-                Allocation *all = malloc(sizeof(Allocation));
-                assert(all != NULL);
-                all->amount = amount;
-                all->name = type;
-                all->type = LOCAL;
-                all->conn = conn;
-                all->result = r;
-
-                all->sig = curr->confirmadas;
-                curr->confirmadas = all;
-                break;
-            }
-            // Sino, se guarda en OutRequests
-            else {
-                OutRequest *out = malloc(sizeof(OutRequest));
-                assert(out != NULL);
-                out->amount = amount;
-                out->conn = remoto;
-                out->tipo = type;
-                strncpy(out->ip, ip, sizeof(out->ip)-1);
-                out->ip[sizeof(out->ip) - 1] = '\0';
-                snprintf(out->msg, sizeof(out->msg), "%s", buf);
-
-                out->next = curr->pendientes;
-                curr->pendientes = out;
-                break;
-            }
-        }
-        curr = curr->sig;
-    }
-    if (take_lock) pthread_mutex_unlock(&j->lock);
 }
 
 /**
@@ -346,9 +298,9 @@ Allocation* tabla_jobs_delete_by_conn(TablaJobs *j, connection_t *conn) {
     return allocs_to_release_head;
 }
 
+// Retorna una lista de solicitudes pendientes asociadas a una conexión
 OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) {
     OutRequest *lista = NULL;
-    pthread_mutex_lock(&j->lock);
     for (int i = 0; i < TAM_TABLA_JOBS; i++) {
         Job *job = j->tabla_jobs[i];
 
@@ -357,8 +309,8 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) 
             OutRequest *req = job->pendientes;
             while (req != NULL) {
                 if (req->conn == conn) {
+                    // Crea un OutRequest
                     OutRequest *nuevo = malloc(sizeof(OutRequest));
-                    assert(nuevo != NULL);
                     nuevo->amount = req->amount;
                     nuevo->conn = req->conn;
                     strncpy(nuevo->ip, req->ip, sizeof(nuevo->ip) - 1);
@@ -367,10 +319,7 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) 
                     nuevo->msg[sizeof(nuevo->msg) - 1] = '\0';
                     nuevo->tipo = req->tipo;
 
-                    if (lista != NULL)
-                    {
-                        nuevo->next = lista;
-                    }
+                    nuevo->next = lista;
                     lista = nuevo;
                 }
 
@@ -379,12 +328,11 @@ OutRequest* tabla_jobs_get_pendientes_by_conn(TablaJobs *j, connection_t *conn) 
             job = job->sig;
         }
     }
-    pthread_mutex_unlock(&j->lock);
     return lista;
 }
 
 /**
- * Toma la solicitud pendiente con el IP enviado, y lo transfiere a la solicitud confirmada del Job dado
+ * Toma la solicitud pendiente con el IP dado, y la transfiere a la solicitud confirmada del Job dado
  * CUIDADO: Esta función no es thread-safe. Asume que se ha tomado tabla->lock antes de entrar acá
  */
 bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
@@ -412,7 +360,6 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
             
             // Crear nuevo Allocation
             Allocation *nuevo = malloc(sizeof(Allocation));
-            assert(nuevo != NULL);
             nuevo->amount = sal->amount;
             nuevo->name = sal->tipo;
             nuevo->type = REMOTE;
@@ -436,7 +383,7 @@ bool tabla_jobs_confirmar(TablaJobs *j, const char *ip, int job_id) {
 }
 
 /**
- * Verifica si todas las solicitudes externas pendientes fueron hechas y si no hay confirmadas que esté encoladas
+ * Verifica si todas las solicitudes externas pendientes fueron hechas y si no hay confirmadas que estén encoladas
  */
 bool tabla_jobs_verificar(TablaJobs *j, int job_id, bool take_lock) {
     if (take_lock) pthread_mutex_lock(&j->lock);
@@ -445,9 +392,6 @@ bool tabla_jobs_verificar(TablaJobs *j, int job_id, bool take_lock) {
     Job *curr = j->tabla_jobs[idx];
     while (curr != NULL) {
         if (curr->job_id == job_id) {
-            /**
-             * TODO: Verificar dentro de todos los Allocations si hay alguno encolado y retornar si es así
-             */
             Allocation *s = curr->confirmadas;
             while (s != NULL) {
                 if (s->type == LOCAL && s->result == RM_QUEUED) {
@@ -459,12 +403,14 @@ bool tabla_jobs_verificar(TablaJobs *j, int job_id, bool take_lock) {
             if (take_lock) pthread_mutex_unlock(&j->lock);
             return (curr->pendientes == NULL);
         }
+        curr = curr->sig;
     }
 
     if (take_lock) pthread_mutex_unlock(&j->lock);
     return false;
 }
 
+// Extrae todos los jobs asociados a la conexión dada
 Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
     
     pthread_mutex_lock(&j->lock);
@@ -505,7 +451,8 @@ Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
     return extraidos;
 }
 
-void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool take_lock) {
+// Cambia el estado del Allocation asociado a una conexión y a un tipo
+void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, resource_t tipo, bool take_lock) {
     if (take_lock) pthread_mutex_lock(&j->lock);
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 
@@ -520,9 +467,15 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool 
         return;
     }
 
+    /* Un Job puede tener varias Allocations LOCAL con la misma conn (una por
+    * tipo de recurso: cpu, mem, gpu). Hace falta filtrar también por tipo de
+    * recurso, si no, siempre se actualiza la primera que aparece en la lista
+    * y las demás quedan con result=RM_QUEUED para siempre, bloqueando el
+    * JOB_GRANTED de ese Job de forma permanente.
+    */
     Allocation *alloc = job->confirmadas;
     while (alloc != NULL) {
-        if (alloc->type == LOCAL && alloc->conn == conn) {
+        if (alloc->type == LOCAL && alloc->conn == conn && alloc->name == tipo) {
             alloc->result = RM_GRANTED;
             if (take_lock) pthread_mutex_unlock(&j->lock);
             return;
@@ -534,6 +487,7 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, bool 
     return;
 }
 
+// Busca y retorna el job correspondiente en la tabla según su ID
 Job* tabla_jobs_buscar_por_id(TablaJobs* t, int job_id) {
     unsigned idx = job_id % TAM_TABLA_JOBS;
     Job* buscado = t->tabla_jobs[idx];
@@ -547,6 +501,7 @@ Job* tabla_jobs_buscar_por_id(TablaJobs* t, int job_id) {
     return buscado;
 }
 
+// Confirma el job y lo mueve a la lista de Allocations
 bool job_confirmar(Job* job, char *ip, int job_id) {
 
     if (job == NULL) return false;
@@ -580,6 +535,7 @@ bool job_confirmar(Job* job, char *ip, int job_id) {
     return false;
 }
 
+// tabla_jobs_buscar_por_id pero elimina el job de la tabla
 Job* tabla_jobs_extract_by_id(TablaJobs *t, int job_id) {
     unsigned int idx = job_id % TAM_TABLA_JOBS;
 

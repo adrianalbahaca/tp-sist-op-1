@@ -10,7 +10,7 @@
 #define BUFF_SIZE 1024 // Tamaño máximo del buffer de cada mensaje a enviar
 
 #define UDP_DISCOVERY_PORT 12529
-#define NUM_THREADS 8
+#define NUM_THREADS 4
 
 /**
  * Identifica el rol de cada fd dentro del loop de epoll.
@@ -39,6 +39,10 @@ typedef struct {
     char write_buf[BUFF_SIZE];
     size_t write_pos;
     size_t write_len;
+
+    // Determina si la conexión se está utilizando
+    // en worker_thread_loop
+    int in_handler; 
 } connection_t;
 
 /**

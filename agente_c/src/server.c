@@ -14,6 +14,38 @@
 #include <sys/socket.h>
 
 #include <pthread.h>
+#include <signal.h>
+
+/**
+ * Determina si la conexión recibida debe usar EPOLLONESHOT
+ * en base a su tipo
+ */
+static int conn_uses_oneshot(const connection_t *conn) {
+    return conn->type == CONN_TCP_CLIENT_REMOTE
+        || conn->type == CONN_TCP_CLIENT_LOCAL
+        || conn->type == CONN_TCP_OUTGOING;
+}
+
+/**
+ * Rearma la conexión en caso de usar EPOLLONESHOT
+ */
+static int rearm_conn(int epfd, connection_t *conn) {
+    struct epoll_event ev;
+
+    pthread_mutex_lock(&conn->write_mutex);
+    conn->in_handler = 0;
+    ev.events = EPOLLIN | EPOLLONESHOT;
+    if (conn->write_len > 0)
+        ev.events |= EPOLLOUT;
+    ev.data.ptr = conn;
+    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+        perror("epoll_ctl mod rearm_conn");
+        pthread_mutex_unlock(&conn->write_mutex);
+        return -1;
+    }
+    pthread_mutex_unlock(&conn->write_mutex);
+    return 0;
+}
 
 /**
  * O_NONBLOCK para que retorne automáticamente y no se bloquee al hacer read, 
@@ -85,6 +117,7 @@ static connection_t* create_listen_socket(int epfd, const char* ip, int port, co
     pthread_mutex_init(&conn->write_mutex, NULL);
     conn->write_pos = 0;
     conn->write_len = 0;
+    conn->in_handler = 0;
 
     // Registramos el evento de lectura (EPOLLIN) asociando el puntero de la estructura
     // EPOLLEXCLUSIVE es para que solo lo tome 1 del epoll_wait, como estamos en multihilo
@@ -134,6 +167,7 @@ connection_t *connect_remote_node(int epfd, const char *ip, int port) {
         return NULL;
     }
 
+    // Crea la conexión
     connection_t *conn = malloc(sizeof(connection_t));
     if (!conn) {
         perror("malloc conn saliente");
@@ -141,21 +175,20 @@ connection_t *connect_remote_node(int epfd, const char *ip, int port) {
         return NULL;
     }
 
-    pthread_mutex_init(&conn->write_mutex, NULL);
-    pthread_mutex_lock(&conn->write_mutex);
     conn->fd = sockfd;
     conn->type = CONN_TCP_OUTGOING;
     conn->read_pos = 0;
+    pthread_mutex_init(&conn->write_mutex, NULL);
     conn->write_pos = 0;
     conn->write_len = 0;
-    pthread_mutex_unlock(&conn->write_mutex);
+    conn->in_handler = 0;
 
-    struct epoll_event ev;
     /**
      * Se espera EPOLLOUT para confirmar que el handshake finalizó. O sea, cuando
      * se pueda escribir significa que funcionó
      * EPOLLONESHOT garantiza exclusión mutua en el event loop multihilo.
      */
+    struct epoll_event ev;
     ev.events = EPOLLOUT | EPOLLONESHOT;
     ev.data.ptr = conn;
 
@@ -170,10 +203,13 @@ connection_t *connect_remote_node(int epfd, const char *ip, int port) {
     return conn;
 }
 
-/* Evalúa el resultado de connect_remote_node, completando la conexión */
-static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
+/** Evalúa el resultado de connect_remote_node, completando la conexión 
+ *  Retorna 0 si la conexión sigue viva, -1 si fue liberada
+ */
+static int handle_outgoing_connection_event(int epfd, connection_t *conn) {
     int socket_error = 0;
     socklen_t errlen = sizeof(socket_error);
+    (void)epfd;
 
     // Obtiene el resultado final
     if (getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &socket_error, &errlen) < 0) {
@@ -182,7 +218,7 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         close(conn->fd);
         pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
-        return;
+        return -1;
     }
     
     if (socket_error != 0) {
@@ -193,34 +229,13 @@ static void handle_outgoing_connection_event(int epfd, connection_t *conn) {
         close(conn->fd);
         pthread_mutex_destroy(&conn->write_mutex);
         free(conn);
-        return;
+        return -1;
     }
 
-    /**
-     * La conexión fue exitosa. 
-     * Se debe reconfigurar el evento en epoll para operar de forma regular
-     * esperando lecturas (EPOLLIN) para recibir los GRANTED/DENIED.
-     */
-    // Ahora la conexión existe
-    pthread_mutex_lock(&conn->write_mutex);
-    conn->type = CONN_TCP_CLIENT_REMOTE; 
-    pthread_mutex_unlock(&conn->write_buf);
-
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLONESHOT;
-    ev.data.ptr = conn;
-
-    // Hace lo que pensabas hacer en un inicio con tu nueva conexión
+    conn->type = CONN_TCP_CLIENT_REMOTE;
     process_connection_ready(conn);
 
-    // Actualiza el registro existente, diciendo que ahora escuche, solo le interesa cuando reciba algo
-    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-        perror("epoll_ctl mod connection success");
-        close(conn->fd);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
-        return;
-    }
+    return 0;
 }
 
 /* Consume los datagramas pendientes */
@@ -268,29 +283,11 @@ static void handle_udp_read(connection_t *conn) {
 static int handle_tcp_read(int epfd, connection_t *conn) {
     pthread_mutex_lock(&conn->write_mutex);
     int bytes_read = read(conn->fd, conn->read_buf + conn->read_pos, BUFF_SIZE - conn->read_pos - 1);
-    pthread_mutex_unlock(&conn->write_mutex);
 
     if (bytes_read < 0) {
+        pthread_mutex_unlock(&conn->write_mutex);
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            pthread_mutex_lock(&conn->write_mutex);
-            /** 
-             * No hay más datos por leer en el buffer del socket del OS.
-             * Debido a EPOLLONESHOT, es obligatorio reactivar el descriptor
-             * para volver a recibir eventos de este cliente.
-             */
-            struct epoll_event ev;
-            ev.events = EPOLLIN | EPOLLONESHOT;
-            ev.data.ptr = conn;
-            if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-                perror("epoll_ctl mod EAGAIN");
-                pthread_mutex_unlock(&conn->write_mutex);
-                process_disconnect(conn);
-                close(conn->fd);
-                pthread_mutex_destroy(&conn->write_mutex);
-                free(conn);
-                return -1;
-            }
-            pthread_mutex_unlock(&conn->write_mutex);
+            /** Sin datos: El worker rearma al salir del evento */
             return 0;
         } else {
             // Error real de E/S
@@ -304,8 +301,8 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
     }
 
     if (bytes_read == 0) {
+        pthread_mutex_unlock(&conn->write_mutex);
         /* EOF: El extremo remoto cerró la conexión de manera ordenada */
-        // NOTIFICACIÓN ANTES DE DESTRUIR
         process_disconnect(conn);
         close(conn->fd);
         pthread_mutex_destroy(&conn->write_mutex);
@@ -313,9 +310,11 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
         return -1;
     }
 
-    // Se actualiza el puntero lógico del buffer
+    // Se actualiza el puntero lógico del buffer 
+    // (bajo lock: read_pos/read_buf se leen y escriben en momentos distintos dentro de esta función)
     conn->read_pos += bytes_read;
-    conn->read_buf[conn->read_pos] = '\0'; 
+    conn->read_buf[conn->read_pos] = '\0';
+    pthread_mutex_unlock(&conn->write_mutex);
 
     char *line_start = conn->read_buf;
     char *newline_pos;
@@ -339,24 +338,35 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
      * al final del buffer, se desplazan al inicio para concatenarlos
      * con la próxima lectura.
      */
+    pthread_mutex_lock(&conn->write_mutex);
     size_t remaining = (conn->read_buf + conn->read_pos) - line_start;
     if (remaining > 0 && line_start > conn->read_buf) {
         memmove(conn->read_buf, line_start, remaining);
     }
     conn->read_pos = remaining;
+    pthread_mutex_unlock(&conn->write_mutex);
 
-    /* Reactivación final del descriptor en epoll (porque era ONESHOT) */
+    return 0;
+}
+
+/* Transmitir los datos por la red */
+static int handle_tcp_write(int epfd, connection_t *conn) {
     pthread_mutex_lock(&conn->write_mutex);
-    struct epoll_event ev;
-    if (conn->write_len > 0) {
-        ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
-    } else {
-        ev.events = EPOLLIN | EPOLLONESHOT;
+    // Calcula los bytes restantes por enviar
+    size_t pending_bytes = conn->write_len - conn->write_pos;
+
+    if (pending_bytes == 0) {
+        pthread_mutex_unlock(&conn->write_mutex);
+        return 0;
     }
-    
-    ev.data.ptr = conn;
-    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-        perror("epoll_ctl mod rearm");
+    ssize_t bytes_written = write(conn->fd, conn->write_buf + conn->write_pos, pending_bytes);
+
+    if (bytes_written < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            pthread_mutex_unlock(&conn->write_mutex);
+            return 0;
+        }
+        perror("write error");
         pthread_mutex_unlock(&conn->write_mutex);
         process_disconnect(conn);
         close(conn->fd);
@@ -364,88 +374,22 @@ static int handle_tcp_read(int epfd, connection_t *conn) {
         free(conn);
         return -1;
     }
-    pthread_mutex_unlock(&conn->write_mutex);
-    return 0;
-}
-
-/* Transmitir los datos por la red */
-static void handle_tcp_write(int epfd, connection_t *conn) {
-    pthread_mutex_lock(&conn->write_mutex);
-    // Calcula los bytes restantes por enviar
-    size_t pending_bytes = conn->write_len - conn->write_pos;
-
-    if (pending_bytes == 0) {
-        /* Salvaguarda lógica si epoll disparó un evento espurio */
-        struct epoll_event ev = { .events = EPOLLIN | EPOLLONESHOT, .data.ptr = conn };
-        epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev);
-        pthread_mutex_unlock(&conn->write_mutex);
-        return;
-    }
-    ssize_t bytes_written = write(conn->fd, conn->write_buf + conn->write_pos, pending_bytes);
-
-    if (bytes_written < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            /**
-             * El buffer del socket está lleno. 
-             * Se rearma el descriptor esperando EPOLLOUT para reanudar luego.
-             */
-            struct epoll_event ev;
-            ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
-            ev.data.ptr = conn;
-            if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-                perror("epoll_ctl mod EAGAIN write");
-                process_disconnect(conn);
-                close(conn->fd);
-                pthread_mutex_unlock(&conn->write_mutex);
-                pthread_mutex_destroy(&conn->write_mutex);
-                free(conn);
-                return;
-            }
-            pthread_mutex_unlock(&conn->write_mutex);
-            return;
-        } else {
-            // Error de conexión (ej. EPIPE si el cliente cerró el socket prematuramente)
-            perror("write error");
-            process_disconnect(conn);
-            close(conn->fd);
-            pthread_mutex_unlock(&conn->write_mutex);
-            pthread_mutex_destroy(&conn->write_mutex);
-            free(conn);
-            return;
-        }
-    }
 
     // Actualizamos el puntero de la cantidad de bytes enviados
     conn->write_pos += bytes_written;
-
-    struct epoll_event ev;
     
     if (conn->write_pos == conn->write_len) {
         /* Buffer vaciado. 
-         * Es imperativo eliminar EPOLLOUT de la máscara de eventos.
+         * Es necesario eliminar EPOLLOUT de la máscara de eventos.
          * Si se mantiene EPOLLOUT sin tener datos pendientes, epoll_wait
          * retornará inmediatamente en un bucle infinito (busy-waiting)
          * porque el socket siempre está listo para escribir.
          */
         conn->write_pos = 0;
         conn->write_len = 0;
-        ev.events = EPOLLIN | EPOLLONESHOT;
-    } else {
-        /* Aún quedan bytes por enviar. Se mantiene EPOLLOUT. */
-        ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
-    }
-
-    // Reactivo el fd
-    ev.data.ptr = conn;
-    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-        perror("epoll_ctl mod write update");
-        process_disconnect(conn);
-        close(conn->fd);
-        pthread_mutex_unlock(&conn->write_mutex);
-        pthread_mutex_destroy(&conn->write_mutex);
-        free(conn);
     }
     pthread_mutex_unlock(&conn->write_mutex);
+    return 0;
 }
 
 /* Acepta todas las conexiones TCP entrantes en los listen sockets*/
@@ -471,6 +415,7 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
 
         set_nonblocking(client_fd);
 
+        // Crear conexión
         connection_t *new_conn = malloc(sizeof(connection_t));
         if (!new_conn) {
             perror("malloc new_conn");
@@ -483,6 +428,7 @@ static void handle_accept(int epfd, connection_t *listen_conn) {
         pthread_mutex_init(&new_conn->write_mutex, NULL);
         new_conn->write_pos = 0;
         new_conn->write_len = 0;
+        new_conn->in_handler = 0;
 
         // Derivación del tipo de conexión según el socket de origen
         if (listen_conn->type == CONN_TCP_PUBLIC_LISTEN) {
@@ -529,9 +475,28 @@ void* worker_thread_loop(void* arg) {
             connection_t *conn = (connection_t *)events[i].data.ptr;
             int connection_closed = 0;
 
+            pthread_mutex_lock(&conn->write_mutex);
+            int oneshot = conn_uses_oneshot(conn);
+            if (oneshot) {
+                conn->in_handler = 1;
+            }
+            pthread_mutex_unlock(&conn->write_mutex);
+
             // Tratamiento de errores en el socket (cierre abrupto, reset)
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & (EPOLLIN | EPOLLOUT)))) {
-                fprintf(stderr, "Error en el socket %d\n", conn->fd);
+                int socket_error = 0;
+                socklen_t errlen = sizeof(socket_error);
+                getsockopt(conn->fd, SOL_SOCKET, SO_ERROR, &socket_error, &errlen);
+                
+                fprintf(stderr, "Error en el socket %d (tipo=%d): EPOLLERR=%d EPOLLHUP=%d EPOLLIN=%d EPOLLOUT=%d SO_ERROR=%s\n",
+                        conn->fd,
+                        conn->type,
+                        (events[i].events & EPOLLERR) != 0,
+                        (events[i].events & EPOLLHUP) != 0,
+                        (events[i].events & EPOLLIN) != 0,
+                        (events[i].events & EPOLLOUT) != 0,
+                        strerror(socket_error));
+                
                 // NOTIFICACIÓN ANTES DE DESTRUIR
                 process_disconnect(conn);
                 close(conn->fd);
@@ -569,15 +534,29 @@ void* worker_thread_loop(void* arg) {
                 switch (conn->type) {
                     case CONN_TCP_CLIENT_REMOTE:
                     case CONN_TCP_CLIENT_LOCAL:
-                        handle_tcp_write(epfd, conn);
+                        if (handle_tcp_write(epfd, conn) == -1) {
+                            connection_closed = 1;
+                        }
                         break;
 
                     case CONN_TCP_OUTGOING:
-                        handle_outgoing_connection_event(epfd, conn);
+                        if (handle_outgoing_connection_event(epfd, conn) == -1) {
+                            connection_closed = 1;
+                        }
                         break;
 
                     default:
                         break;
+                }
+            }
+
+            // Rearmar conexiones que usan EPOLLONESHOT
+            if (!connection_closed && oneshot) {
+                if (rearm_conn(epfd, conn) < 0) {
+                    process_disconnect(conn);
+                    close(conn->fd);
+                    pthread_mutex_destroy(&conn->write_mutex);
+                    free(conn);
                 }
             }
         }
@@ -587,6 +566,8 @@ void* worker_thread_loop(void* arg) {
 
 /* Inicializa la estructura del agente */
 int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
+
+    signal(SIGPIPE, SIG_IGN);
 
     *epfd = epoll_create1(0);
     if (*epfd < 0) {
@@ -607,13 +588,16 @@ int init_server_sockets(const char* public_ip, int tcp_port, int *epfd) {
      * Después de estos 3 create, se han creado 3 sockets de escucha que ahora
      * iterarán en work_thread_loop. Están en la instancia de epoll y estarán
      * esperando que alguien les diga algo. Los 3 están en escucha por si les 
-     * llega algo, y según cuando llegue un mensjae, el epoll verá para quien y
+     * llega algo, y según cuándo llegue un mensaje, el epoll verá para quien y
      * lo redirigirá
      */
 
     return 0;
 }
 
+/**
+ * Encola 
+ */
 void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     size_t msg_len = strlen(msg);
      
@@ -627,20 +611,16 @@ void enqueue_write(int epfd, connection_t *conn, const char *msg) {
     }
 
     // Copiar el nuevo mensaje al final real de la cola pendiente
-    memcpy(conn->write_buf + conn->write_pos + conn->write_len, msg, msg_len);
+    memcpy(conn->write_buf + conn->write_len, msg, msg_len);
     conn->write_len += msg_len;
-
-    /* Forzar la activación de EPOLLOUT en el kernel.
-     * Al agregar EPOLLOUT, el hilo despertará en la próxima iteración
-     * de epoll_wait e invocará handle_tcp_write.
-     */
     
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
-    ev.data.ptr = conn;
-    
-    if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-        perror("epoll_ctl mod enqueue_write");
+    if (!conn->in_handler) {
+        struct epoll_event ev;
+        ev.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+        ev.data.ptr = conn;
+        if (epoll_ctl(epfd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+            perror("epoll_ctl mod enqueue_write");
+        }
     }
     
     pthread_mutex_unlock(&conn->write_mutex);

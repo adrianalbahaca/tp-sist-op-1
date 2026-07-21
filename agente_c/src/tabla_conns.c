@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
+// Inicializa la tabla de conexiones
 void tabla_conns_init(TablaConns *tabla_conns) {
     for (int i = 0; i < TAM_TABLA_CONN; i++) {
         tabla_conns->buckets[i] = NULL;
@@ -11,6 +12,7 @@ void tabla_conns_init(TablaConns *tabla_conns) {
     return;
 }
 
+// Función hash según IP
 static unsigned int hash_ip(const char *ip) {
     unsigned int hash = 0;
     while (*ip) {
@@ -20,13 +22,13 @@ static unsigned int hash_ip(const char *ip) {
     return hash % TAM_TABLA_CONN;
 }
 
+// Inserta la conexión en la tabla
 void tabla_conns_insert(TablaConns *tabla_conns, char ip[], connection_t *conn) {
     
     pthread_mutex_lock(&tabla_conns->mutex);
     unsigned int idx = hash_ip(ip);
 
     ConnEntry *c = malloc(sizeof(ConnEntry));
-    assert(c != NULL);
     c->conn = conn;
     strncpy(c->ip, ip, sizeof(c->ip) - 1);
     c->ip[sizeof(c->ip) - 1] = '\0';
@@ -40,6 +42,7 @@ void tabla_conns_insert(TablaConns *tabla_conns, char ip[], connection_t *conn) 
     pthread_mutex_unlock(&tabla_conns->mutex);
 }
 
+// Busca la conexión en la tabla y la retorna
 connection_t* tabla_conns_lookup(TablaConns *tabla_conns, const char ip[]) {
     pthread_mutex_lock(&tabla_conns->mutex);
     unsigned int idx = hash_ip(ip);
@@ -59,6 +62,7 @@ connection_t* tabla_conns_lookup(TablaConns *tabla_conns, const char ip[]) {
     return NULL;
 }
 
+// Busca la conexión en la tabla y retorna su IP
 char* tabla_conns_get_ip_by_conn(TablaConns *tabla_conns, connection_t *conn) {
     pthread_mutex_lock(&tabla_conns->mutex);
 
@@ -77,6 +81,7 @@ char* tabla_conns_get_ip_by_conn(TablaConns *tabla_conns, connection_t *conn) {
     return NULL;
 }
 
+// Elimina la conexión de la tabla asociada a la IP dada
 void tabla_conns_delete(TablaConns *tabla_conns, char ip[]) {
     pthread_mutex_lock(&tabla_conns->mutex);
     unsigned int idx = hash_ip(ip);
@@ -104,6 +109,7 @@ void tabla_conns_delete(TablaConns *tabla_conns, char ip[]) {
     pthread_mutex_unlock(&tabla_conns->mutex);
 }
 
+// La función anterior pero dada una estructura conexión
 void tabla_conns_delete_by_conn(TablaConns *tabla_conns, connection_t *conn) {
     pthread_mutex_lock(&tabla_conns->mutex);
 
@@ -132,6 +138,7 @@ void tabla_conns_delete_by_conn(TablaConns *tabla_conns, connection_t *conn) {
     pthread_mutex_unlock(&tabla_conns->mutex);
 }
 
+// Destruye la tabla de conexiones
 void tabla_conns_destroy(TablaConns *tabla_conns) {
     pthread_mutex_lock(&tabla_conns->mutex);
     for (int i = 0; i < TAM_TABLA_CONN; i++) {

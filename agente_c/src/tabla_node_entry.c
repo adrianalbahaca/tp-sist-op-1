@@ -5,6 +5,7 @@
 // Definición de la tabla de nodos externa en el Resource Manager
 TablaNodos tabla_nodos;
 
+// Función hash por IP
 static unsigned int hash_ip(const char *ip) {
     unsigned int hash = 0;
     while (*ip) {
@@ -14,6 +15,7 @@ static unsigned int hash_ip(const char *ip) {
     return hash % TAM_TABLA_CONN;
 }
 
+// Inicializa la tabla de nodos
 void tabla_nodos_init() {
     for (int i = 0; i < TAM_TABLA_CONN; i++) {
         tabla_nodos.buckets[i] = NULL;
@@ -47,7 +49,6 @@ void tabla_nodos_insert_or_update(const char *ip, int puerto, int cpu, int mem, 
 
     // No existía, se crea una entrada nueva
     NodeEntry *nuevo = malloc(sizeof(NodeEntry));
-    assert(nuevo != NULL);
     strncpy(nuevo->ip, ip, sizeof(nuevo->ip) - 1);
     nuevo->ip[sizeof(nuevo->ip) - 1] = '\0';
     nuevo->puerto = puerto;
@@ -116,7 +117,7 @@ void tabla_nodos_purge(int timeout_secs) {
     pthread_mutex_unlock(&tabla_nodos.mutex);
 }
 
-
+// Destruye la tabla de nodos
 void tabla_nodos_destroy() {
     pthread_mutex_lock(&tabla_nodos.mutex);
     for (int i = 0; i < TAM_TABLA_CONN; i++) {

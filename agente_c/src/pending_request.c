@@ -2,8 +2,8 @@
 #include "pending_request.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include <assert.h>
 
+// Convierte el origin_t al string correspondiente
 char* type_to_str(origin_t origen) {
     switch(origen) {
         case ORIGIN_LOCAL:
@@ -18,6 +18,7 @@ char* type_to_str(origin_t origen) {
     }
 }
 
+// Imprime la cola por pantalla
 void queue_print(ColaPendingRequest *c) {
     printf("[QUEUE]: [");
     for (PendingRequest *nodo = c->top; nodo != NULL; nodo = nodo->sig) {
@@ -27,12 +28,14 @@ void queue_print(ColaPendingRequest *c) {
     return;
 }
 
+// Inicializa la cola
 void queue_init(ColaPendingRequest* c) {
     c->top = NULL;
     c->bottom = NULL;
     c->amount = 0;
 }
 
+// Destruye la cola
 void queue_destroy(ColaPendingRequest* c) {
     PendingRequest* curr = c->top;
     while (curr != NULL) {
@@ -44,10 +47,12 @@ void queue_destroy(ColaPendingRequest* c) {
     c->bottom = NULL;
 }
 
+// Determina si la cola está vacía
 bool queue_is_empty(ColaPendingRequest *c) {
     return (c->top == NULL && c->bottom == NULL);
 }
 
+// Elimina el elemento de la cola asociado a la conexión dada
 void queue_delete_by_conn(ColaPendingRequest *c, connection_t *conn) {
     PendingRequest *curr = c->top;
     PendingRequest *prev = NULL;
@@ -80,6 +85,7 @@ void queue_delete_by_conn(ColaPendingRequest *c, connection_t *conn) {
     return;
 }
 
+// Elimina el elemento de la cola asociado a la conexión dada 
 void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
     PendingRequest *curr = c->top;
     PendingRequest *prev = NULL;
@@ -104,12 +110,12 @@ void queue_delete_by_job_id(ColaPendingRequest *c, int job_id) {
 }
 
 /**
+ * Encola un job
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado el mutex del recurso antes
  */
 bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* conn, int max_amount, origin_t origen) {
     
     PendingRequest* pending = malloc(sizeof(PendingRequest));
-    assert(pending != NULL);
     pending->job_id = job_id;
     pending->amount = amount;
     pending->owner_conn = conn;
@@ -131,6 +137,7 @@ bool queue_enqueue(ColaPendingRequest *c, int job_id, int amount, connection_t* 
 }
 
 /**
+ * Desencola un job
  * CUIDADO: Esta función no es thread-safe por sí misma. Asume que se ha tomado el mutex del recurso antes
  */
 PendingRequest* queue_dequeue(ColaPendingRequest *c) {
