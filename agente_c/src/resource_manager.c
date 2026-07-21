@@ -590,6 +590,7 @@ void process_message(connection_t *conn, char *msg)
 
         if (tabla_jobs_verificar(&manager.tabla, result.job_id, false))
             send_message(conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_GRANTED %d\n", result.job_id);
+        
         pthread_mutex_unlock(&manager.tabla.lock);
     }
     /**
