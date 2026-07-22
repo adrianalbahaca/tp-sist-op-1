@@ -184,7 +184,8 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
 
     if (manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
         manager.recursos[tipo].available_amount += amount;
-    else{
+    else 
+    {
         fprintf(stderr, "[!] Se hizo un release inválido!. Se ignora silenciosamente\n");
         pthread_mutex_lock(&manager.recursos[tipo].mutex);
         if (take_lock) pthread_mutex_unlock(&manager.tabla.lock);
@@ -229,6 +230,7 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
     }
     pthread_mutex_unlock(&manager.recursos[tipo].mutex);
     if (take_lock) pthread_mutex_unlock(&manager.tabla.lock);
+    return;
 }
 
 /**
@@ -361,8 +363,10 @@ void process_message(connection_t *conn, char *msg)
 
             if (check == NULL)
             {
-                // El Job fue liberado anteriormente y tiene que solicitarse que suelte los recursos
-                // Para ello, asumiendo que los otros nodos tienen limpieza de fantasmas, se le solicita que liberen vacíos para inducir una limpieza de fantasmas
+                /**
+                 * El Job fue liberado anteriormente y tiene que solicitarse que suelte los recursos 
+                 * Para ello, asumiendo que los otros nodos tienen limpieza de fantasmas, se le solicita que liberen vacíos para inducir una limpieza de fantasmas
+                 */
                 send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "RELEASE %d %s %d\n", result.job_id, "cpu", 0);
                 send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "RELEASE %d %s %d\n", result.job_id, "mem", 0);
                 send_message(conn, g_epfd, DEST_AGENTE_REMOTO, "RELEASE %d %s %d\n", result.job_id, "gpu", 0);
@@ -370,16 +374,9 @@ void process_message(connection_t *conn, char *msg)
                 return;
             }
 
-            bool confirmado = job_confirmar(check, ip_remoto, result.job_id);
-
-            if (confirmado)
+            if (job_confirmar(check, ip_remoto, result.job_id) && tabla_jobs_verificar(&manager.tabla, result.job_id, false))
             {
-                bool verificado = tabla_jobs_verificar(&manager.tabla, result.job_id, false);
-
-                if (verificado)
-                {
                     send_message(check->conn, g_epfd, DEST_ERLANG_LOCAL, "JOB_GRANTED %d\n", result.job_id);
-                }
             }
 
             pthread_mutex_unlock(&manager.tabla.lock);
