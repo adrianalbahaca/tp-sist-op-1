@@ -548,7 +548,6 @@ void process_message(connection_t *conn, char *msg)
                                 connection_t *remote = tabla_conns_lookup(&conns, allocs->ip);
                                 if (remote != NULL)
                                 {
-                                    // Funcion para mandar mensaje?
                                     send_message(remote, g_epfd, DEST_AGENTE_REMOTO, "RELEASE %d %s %d\n", allocs->job_id, resource_type_to_str(allocs->name), allocs->amount);
                                 }
                             }
