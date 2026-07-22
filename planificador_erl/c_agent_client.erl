@@ -29,8 +29,12 @@ calcular_node_suffix() ->
         false ->
             case inet:getif() of
                 {ok, Ifs} ->
+                    % En la lista de tuplas {IP, BCast, Mask}, 
+                    % conserva sólo las IP que no sean loopback
                     NoLoopback = [Ip || {Ip, _Bcast, _Mask} <- Ifs, Ip =/= {127, 0, 0, 1}],
                     case NoLoopback of
+                        % Agarra el último octeto de la primera IP
+                        % o genera un número aleatorio hasta 255
                         [{_, _, _, Ultimo} | _] -> Ultimo;
                         [] -> rand:uniform(256) - 1
                     end;
@@ -38,7 +42,7 @@ calcular_node_suffix() ->
             end;
         Valor -> list_to_integer(Valor)
     end,
-    % Bruto % 256
+    % Retorna el resto de Bruto/256
     Bruto rem 256.
 
 % Genera un job_id único
@@ -160,8 +164,6 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
                 _ ->
                     Job_id = nuevo_job_id(),
                     gen_tcp:send(Socket, "JOB_REQUEST " ++ integer_to_list(Job_id) ++ " " ++ Comando ++ "\n"),
-                    
-                    %io:format(user, "JOB_REQUEST ~p ~s~n", [Job_id, Comando]),
 
                     Pid = spawn(?MODULE, job_handler, [Job_id]),
                     NewMap = maps:put(Job_id, Pid, HandlersMap),
@@ -173,7 +175,7 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
 registrar_log(JobId, Estado, Detalle) ->
     {_, {H, Min, S}} = erlang:localtime(),
     LogTexto = io_lib:format("[~.2.0w:~.2.0w:~.2.0w] [JOB ~p] [~s] -> ~s~n", [H, Min, S, JobId, Estado, Detalle]),
-    % Abre el archivo en modo append (agregar al final) y escribe de forma segura
+    % Abre el archivo en modo append (escribir al final)
     file:write_file("planificador.log", LogTexto, [append]).
 
 get_nodes(Socket) ->
@@ -193,8 +195,10 @@ get_nodes(Socket) ->
             
             ListDeMapas;
 
+        % Si el cliente aborta el job por timeout justo antes de recibir respuesta
+        % del agente C, puede que la recibamos estando acá. Ignoramos el mensaje
         {ok, Mensaje} ->
-            io:format("Precaución: Mensaje temprano: ~p ~n", [Mensaje]),
+            io:format("Mensaje tardío ignorado: ~p ~n", [Mensaje]),
             get_nodes(Socket);
 
         {error, Reason} ->
@@ -205,9 +209,9 @@ get_nodes(Socket) ->
 
 % Loop principal del proceso master
 masterloop(Maps_list, Socket, HandlersMap) ->
-    % Si el mapa se vació, significa que la ráfaga anterior terminó con éxito. Disparamos otra.
     
-    % Si terminó la ráfaga, actualizamos la lista de nodos    
+    % Si el mapa se vació, significa que la ráfaga anterior terminó.
+    % Actualizamos la lista de nodos    
     NuevoMapsList = 
         case maps:size(HandlersMap) of
             0 -> get_nodes(Socket);
@@ -233,7 +237,6 @@ masterloop(Maps_list, Socket, HandlersMap) ->
             masterloop(NuevoMapsList, Socket, CleanMapInterno)
     after 0 -> 
         % Si no hay liberaciones internas, escuchamos lo que llega de la red (Agente C)
-        %io:format("ESPERANDO~n"),
         case gen_tcp:recv(Socket, 0, 5000) of
             {ok, LineaConSalto} ->
                 % Removemos el \n de la línea
@@ -287,7 +290,7 @@ start() ->
             register(master, self()),
     
             % Arrancamos el masterloop con un mapa de jobs pendientes
-            % Y uno de nodos, ambos vacíos #{}
+            % Y una lista de nodos, ambos vacíos
             io:format("Entrando a masterloop...~n"),
             masterloop([], Socket, #{}),
             gen_tcp:close(Socket);
@@ -307,7 +310,7 @@ test_deadlock1() ->
             NodoRojo = maps:from_list([{"host", "10.0.0.20"}, {"recurso", "gpu:1"}]),
             Ordenados = host_sort([NodoAzul, NodoRojo]), % Pedir CPU primero
 
-            % Armamos el string a partir del orden YA decidido por la función
+            % Armamos el string a partir del orden ya decidido por la función
             Comando = lists:foldl(
                 fun(Map, Acc) -> Acc ++ "@" ++ maps:get("host", Map) ++ ":" ++ maps:get("recurso", Map) ++ " " end,
                 "",
@@ -344,7 +347,7 @@ test_deadlock2() ->
             NodoRojo = maps:from_list([{"host", "10.0.0.20"}, {"recurso", "gpu:1"}]),
             Ordenados = host_sort([NodoRojo, NodoAzul]), % Pedir GPU primero
 
-            % Armamos el string a partir del orden YA decidido por la función
+            % Armamos el string a partir del orden ya decidido por la función
             Comando = lists:foldl(
                 fun(Map, Acc) -> Acc ++ "@" ++ maps:get("host", Map) ++ ":" ++ maps:get("recurso", Map) ++ " " end,
                 "",
