@@ -187,7 +187,7 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
     else 
     {
         fprintf(stderr, "[!] Se hizo un release inválido!. Se ignora silenciosamente\n");
-        pthread_mutex_lock(&manager.recursos[tipo].mutex);
+        pthread_mutex_unlock(&manager.recursos[tipo].mutex);
         if (take_lock) pthread_mutex_unlock(&manager.tabla.lock);
         return;
     }
