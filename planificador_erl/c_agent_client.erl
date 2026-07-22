@@ -9,6 +9,7 @@
 -define(GET_NODES, "GET_NODES\n").
 
 -define(RAFAGA, 2).
+-define(CANT_NODOS, 4).
 -define(DIVISOR, 16).
 
 % Genera el sufijo del Job_id basándose en la IP
@@ -66,17 +67,20 @@ host_sort(Maps_list) ->
         Maps_list
     ).
 
+% Elige N elementos aleatorios de la lista dada
+elegir_n_aleatorios(Lista, N) ->
+    ConClaveRandom = [{rand:uniform(), X} || X <- Lista],
+    Ordenada = lists:sort(ConClaveRandom),
+    Primeros = lists:sublist(Ordenada, N),
+    [X || {_, X} <- Primeros].
+
 % Primera parte de "armar_comando"
 % Ordena la lista de nodos y arma el comando de JOB_REQUEST 
 % que se enviará al agente c 
-armar_comando(Maps_list) -> 
-    ListaOrdenada = lists:sort(
-        fun(A, B) -> maps:get("host", A) =< maps:get("host", B) end, 
-        Maps_list
-    ),
+armar_comando(Maps_list) ->
+    NodosElegidos = elegir_n_aleatorios(Maps_list, ?CANT_NODOS),
+    ListaOrdenada = host_sort(NodosElegidos),
     armar_comando_ordenado(ListaOrdenada).
-    
-    % armar_comando_ordenado([lists:nth(rand:uniform(length(Maps_list)), Maps_list)]).
 
 % Segunda parte de "armar_comando"
 armar_comando_ordenado(Maps_list) ->
