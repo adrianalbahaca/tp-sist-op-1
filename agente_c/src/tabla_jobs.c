@@ -395,43 +395,78 @@ bool tabla_jobs_verificar(TablaJobs *j, int job_id, bool take_lock) {
     return false;
 }
 
-// Extrae todos los jobs asociados a la conexión dada
-Job* tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn) {
-    
+Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn)
+{
     pthread_mutex_lock(&j->lock);
-    Job *extraidos = NULL;  // lista de jobs a retornar
-    
-    for (int idx = 0; idx < TAM_TABLA_JOBS; idx++) {
+    Job *extraidos = NULL;
+
+    for (int idx = 0; idx < TAM_TABLA_JOBS; idx++)
+    {
         Job *prev = NULL;
         Job *curr = j->tabla_jobs[idx];
-        
-        while (curr != NULL) {
+
+        while (curr != NULL)
+        {
             Job *next = curr->sig;
-            
-            // Chequear si algún OutRequest de este job tiene esa conn
-            bool afectado = false;
+
+            // Paso 1: sacar cualquier Allocation en 'confirmadas' que use esta conn
+            Allocation *aprev = NULL;
+            Allocation *acurr = curr->confirmadas;
+            while (acurr != NULL)
+            {
+                Allocation *anext = acurr->sig;
+                if (acurr->type == REMOTE && acurr->conn == conn)
+                {
+                    // desenlazar y liberar este Allocation específico
+                    if (aprev == NULL)
+                        curr->confirmadas = anext;
+                    else
+                        aprev->sig = anext;
+                    free(acurr);
+                }
+                else
+                {
+                    aprev = acurr;
+                }
+                acurr = anext;
+            }
+
+            // Paso 2: chequear si con esto el job quedó "vacío"
+            bool sin_confirmadas = (curr->confirmadas == NULL);
+            bool sin_pendientes_de_esta_conn = true; // ya cubierto por la lógica existente de 'pendientes'
+
+            // (la lógica existente de 'pendientes' con esta conn sigue igual que antes)
+            bool afectado_por_pendientes = false;
             OutRequest *out = curr->pendientes;
-            while (out != NULL) {
-                if (out->conn == conn) { afectado = true; break; }
+            while (out != NULL)
+            {
+                if (out->conn == conn)
+                {
+                    afectado_por_pendientes = true;
+                    break;
+                }
                 out = out->next;
             }
-            
-            if (afectado) {
-                // Desenlazar de la tabla
-                if (prev == NULL) j->tabla_jobs[idx] = next;
-                else prev->sig = next;
-                
-                // Agregar a la lista de extraídos
+
+            if (afectado_por_pendientes || (sin_confirmadas && curr->pendientes == NULL))
+            {
+                // extraer el job completo (mismo código que ya tenías)
+                if (prev == NULL)
+                    j->tabla_jobs[idx] = next;
+                else
+                    prev->sig = next;
                 curr->sig = extraidos;
                 extraidos = curr;
-                curr = next;
-            } else {
-                prev = curr;
-                curr = next;
             }
+            else
+            {
+                prev = curr;
+            }
+
+            curr = next;
         }
     }
-    
+
     pthread_mutex_unlock(&j->lock);
     return extraidos;
 }

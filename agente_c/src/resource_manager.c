@@ -766,25 +766,43 @@ void process_disconnect(connection_t *conn)
     limpiar_colas_por_conn(conn);
 
     // Luego, para la tabla de jobs, es necesario eliminarlos de la tabla de Jobs
-    Allocation *lista = tabla_jobs_delete_by_conn(&manager.tabla, conn);
+    Job *lista = tabla_jobs_extract_by_remote_conn(&manager.tabla, conn);
 
-    /**
-     * Liberar cada recurso remoto
-     */
     while (lista != NULL)
     {
-        Allocation *n = lista->sig;
-        if (lista->type == LOCAL && lista->result == RM_GRANTED)
-            release_resource(lista->name, lista->amount, true);
+        Job *sig = lista->sig;
 
-        else if (lista->type == REMOTE)
+        limpiar_colas_por_id(lista->job_id);
+
+        Allocation *all = lista->confirmadas;
+        while (all != NULL)
         {
-            connection_t *remote = tabla_conns_lookup(&conns, lista->ip);
-            if (remote != NULL)
-                send_message(remote, g_epfd, DEST_AGENTE_REMOTO, "RELEASE %d %s %d\n", lista->job_id, resource_type_to_str(lista->name), lista->amount);
+            Allocation *n = all->sig;
+            if (all->type == LOCAL && all->result == RM_GRANTED)
+                release_resource(all->name, all->amount, true);
+
+            else if (all->type == REMOTE)
+            {
+                connection_t *remote = tabla_conns_lookup(&conns, all->ip);
+                if (remote != NULL)
+                {
+                    send_message(remote, g_epfd, DEST_AGENTE_REMOTO, "RELEASE %d %s %d\n", lista->job_id, resource_type_to_str(all->name), all->amount);
+                }
+            }
+            free(all);
+            all = n;
         }
+
+        OutRequest *sal = lista->pendientes;
+        while (sal != NULL)
+        {
+            OutRequest *n = sal->next;
+            free(sal);
+            sal = n;
+        }
+
         free(lista);
-        lista = n;
+        lista = sig;
     }
 
     // Finalmente, se elimina la conexión de la tabla de nodos conectados

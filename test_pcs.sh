@@ -5,11 +5,15 @@
 # laboratorio real, donde cada compañero corre ambos en su máquina.
 #
 # Uso:
-#   ./test_3pcs.sh N
+#   ./test_pcs.sh N
 #
 # Ejemplos:
-#   ./test_3pcs.sh 3      -> simula 3 PCs (pc1, pc2, pc3)
-#   ./test_3pcs.sh 6      -> simula 6 PCs (pc1 .. pc6)
+#   ./test_pcs.sh 3      -> simula 3 PCs (pc1, pc2, pc3)
+#   ./test_pcs.sh 6      -> simula 6 PCs (pc1 .. pc6)
+#
+# Además, a mitad de la corrida, mata aleatoriamente el agente C de UNA
+# de las PCs, para verificar que el resto del sistema sigue funcionando
+# (resiliencia parcial ante la caída de un nodo).
 #
 # Topología:
 #   br0 (bridge, sin IP, solo para que el broadcast UDP llegue a todas)
@@ -20,8 +24,8 @@
 #
 # Usalo desde la raíz del repo (TP-Final/), donde está el Makefile.
 #
-# IMPORTANTE: NO correr este script con "sudo bash ./test_3pcs.sh".
-# Corrarlo como tu usuario normal: ./test_3pcs.sh N
+# IMPORTANTE: NO correr este script con "sudo bash ./test_pcs.sh".
+# Corrarlo como tu usuario normal: ./test_pcs.sh N
 # El script pide sudo SOLO para los comandos de red (ip netns / ip link).
 # Si se corre todo bajo sudo, "make all" hereda el PATH restringido de sudo
 # (secure_path) y puede no encontrar erlc/erl aunque "which erlc" sí los vea
@@ -53,7 +57,7 @@ fi
 
 if [ "$EUID" -eq 0 ]; then
     echo "[!] No corras este script con sudo/como root directamente."
-    echo "    Corrélo como tu usuario normal: ./test_3pcs.sh $N_PCS"
+    echo "    Corrélo como tu usuario normal: ./test_pcs.sh $N_PCS"
     echo "    (el script va a pedir sudo solo donde lo necesita, para 'ip netns'/'ip link')"
     exit 1
 fi
@@ -114,9 +118,6 @@ cleanup
 mkdir -p logs
 
 echo "[*] Compilando proyecto (agente C + beam de Erlang)..."
-# /tmp/build.log puede haber quedado de una corrida vieja con otro dueño
-# (ej. si alguna vez se corrió el script con sudo). Lo limpiamos primero
-# para no fallar silenciosamente al redirigir la salida de "make" ahí.
 sudo rm -f /tmp/build.log
 touch /tmp/build.log
 
@@ -159,15 +160,16 @@ done
 sleep 1
 
 echo "[*] Levantando agente C en cada una de las $N_PCS PC(s) (con la IP REAL de cada netns)..."
+declare -A AGENTE_PIDS
 for ns in "${PC_NAMES[@]}"; do
     ip=${IPS[$ns]}
     cpu=${CPUS[$ns]}
     mem=${MEMS[$ns]}
     gpu=${GPUS[$ns]}
     sudo ip netns exec "$ns" stdbuf -oL -eL ./agente "$ip" $PUERTO "$cpu" "$mem" "$gpu" < /dev/null > "logs/log_${ns}.txt" 2>&1 &
+    AGENTE_PIDS[$ns]=$!
 done
 
-echo "[*] Arrancando Erlang CASI INMEDIATO (2s) para reproducir el timing real reportado..."
 sleep 2
 
 echo "[*] Levantando el planificador Erlang DENTRO de cada PC (cada una habla con su propio localhost:$PUERTO)..."
@@ -178,8 +180,25 @@ for ns in "${PC_NAMES[@]}"; do
     " > "logs/erlang_${ns}.txt" 2>&1 &
 done
 
-echo "[*] Corriendo. Dejando que los planificadores disparen unas ráfagas de jobs (60s)..."
-sleep 120
+# -------------------------------------------------------------------------
+# Prueba de resiliencia: a mitad de la corrida, matamos el agente C
+# de UNA PC elegida al azar, para verificar que el resto del sistema
+# sigue funcionando con normalidad (o al menos, no colapsa en cadena).
+# -------------------------------------------------------------------------
+echo "[*] Corriendo. Dejando que los planificadores disparen unas ráfagas de jobs (120s)..."
+
+MITAD=60
+echo "[*] Esperando ${MITAD}s antes de matar un agente al azar..."
+sleep "$MITAD"
+
+PC_VICTIMA="${PC_NAMES[$((RANDOM % N_PCS))]}"
+PID_VICTIMA="${AGENTE_PIDS[$PC_VICTIMA]}"
+echo "[*] Matando el agente C de $PC_VICTIMA (${IPS[$PC_VICTIMA]}, pid $PID_VICTIMA) para probar resiliencia..."
+sudo ip netns exec "$PC_VICTIMA" kill -9 "$PID_VICTIMA" 2>/dev/null
+
+RESTO=$((120 - MITAD))
+echo "[*] Esperando ${RESTO}s más, con $PC_VICTIMA caída, para ver cómo reacciona el resto..."
+sleep "$RESTO"
 
 echo "[*] Deteniendo todas las instancias de Erlang..."
 sudo pkill -9 -f "c_agent_client" 2>/dev/null
@@ -189,6 +208,8 @@ stty sane 2>/dev/null
 echo ""
 echo "======================================================================"
 echo " RESULTADOS"
+echo "======================================================================"
+echo " PC caída durante la prueba: $PC_VICTIMA (${IPS[$PC_VICTIMA]})"
 echo "======================================================================"
 
 for ns in "${PC_NAMES[@]}"; do
