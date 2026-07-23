@@ -42,7 +42,6 @@ void resource_list_destroy(resource_request_t *list) {
 
     while (list != NULL) {
         next = list->next;
-        // free(list->ip);
         free(list);
         list = next;
     }
