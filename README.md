@@ -35,7 +35,7 @@ GCC: Versión 9 o superior
 
 Bibliotecas: pthread, librerías estándar de C
 
-Sistema operativo: Linux (con soporte para epoll)
+Sistema operativo: Distribución de Linux (con soporte para epoll)
 
 - **Para el Planificador Erlang**
 Erlang/OTP: Versión 24 o superior
@@ -49,12 +49,12 @@ $ make all
 ```
 
 ## Ejecucion 
-para que los nodos puedan descubrirse entre si, deben usar
-la IP de la red local, puedes obtenerla con: hostname -I
+para que los nodos puedan descubrirse entre si, debe usarse
+la IP obtenible con: hostname -I
 
 - # Parametros de ejecucion
 
-- direccion de IP publica del nodo
+- direccion IP del nodo (hostname -I)
 - puerto TCP para comunicaciones 
 - cantidad de CPUs disponibles
 - cantidad de memoria en MB
@@ -67,7 +67,11 @@ make run-c IP=<IP_PUBLICA> PORT=<PUERTO> CPU=<CANTIDAD_CPU> MEM=<CANTIDAD_MEM> G
 [RX] De ERLANG LOCAL (fd 5) -> GET_NODES
 [TX] A ERLANG LOCAL (fd 5) -> NODES 192.168.1.50:8000:cpu:8:mem:16384:gpu:2;
 [RX] De ERLANG LOCAL (fd 5) -> JOB_REQUEST 1 @192.168.1.50:cpu:2:mem:1024:gpu:0
-[TX] A AGENTE REMOTO 192.168.1.51 (fd 7) -> RESERVE 1 gpu 1
+[TX] A AGENTE REMOTO 192.168.1.51 (fd 7) -> RESERVE 1 cpu 2
+[TX] DESDE AGENTE REMOTO 192.168.1.51 (fd 7) -> GRANTED 1
+[TX] A AGENTE REMOTO 192.168.1.51 (fd 7) -> RESERVE 1 mem 1024
+[TX] DESDE AGENTE REMOTO 192.168.1.51 (fd 7) -> GRANTED 1 
+[TX] A ERLANG LOCAL 192.168.1.51 (fd 7) -> JOB_GRANTED 1
 ...
 
 # Ejecutar Planificador erlang - Sintaxis
@@ -77,13 +81,17 @@ make run-erl
 
 # Salida Esperada del planificador Erlang
 Conectado al agente C en el puerto 8000
-Mensaje enviado: GET_NODES
 Entrando a masterloop...
-ESPERANDO
+Job 1 esperando asignación...
+Job 2 esperando asignación...
 Job 1 trabajando...
-Job 1 finalizó. Solicitando RELEASE general.
-ESPERANDO
 Job 2 trabajando...
+Job 1 finalizó. Solicitando RELEASE general.
+Job 2 finalizó. Solicitando RELEASE general.
+Job 3 esperando asignación...
+Job 4 esperando asignación...
+Job 3 trabajando...
+Job 4 trabajando... 
 ...
 
 ## Limpieza
