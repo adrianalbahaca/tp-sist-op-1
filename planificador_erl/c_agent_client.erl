@@ -161,7 +161,6 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
 
         Cantidad ->
             Comando = armar_comando(Maps_list),
-            io:format("Enviando: ~s~n", [Comando]),
             case Comando of
                 "" -> 
                     disparar_rafaga(Maps_list, Socket, Cantidad - 1, HandlersMap);
