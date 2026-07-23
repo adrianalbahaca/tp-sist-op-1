@@ -135,18 +135,21 @@ job_handler(Job_id) ->
         granted ->
             io:format("Job ~p trabajando...~n", [Job_id]),
             sleep(1000 + rand:uniform(4000)),
-            io:format("Job ~p finalizó. Solicitando RELEASE...~n", [Job_id]),
-            master ! {release, Job_id};
+            io:format("Job ~p finalizó. Solicitando RELEASE...~n", [Job_id]);
         denied ->
-            io:format("Job ~p DENEGADO. Abortando...~n", [Job_id]),
-            master ! {release, Job_id};
+            io:format("Job ~p DENEGADO. Abortando...~n", [Job_id]);
         timeout ->
-            io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
-            master ! {release, Job_id}
+            io:format("Job ~p (Timeout). Abortando...~n", [Job_id])
         after 30000 ->
             % Paso algo raro, demasiado tiempo esperando
-            io:format("Job ~p (Timeout). Abortando...~n", [Job_id]),
-            master ! {release, Job_id}
+            io:format("Job ~p (Timeout). Abortando...~n", [Job_id])
+    end,
+    
+    % Si no existe el proceso master, no se hace el send
+    % El agente C ya libera los recursos por su cuenta
+    case whereis(master) of
+        undefined -> nothing;
+        _ -> master ! {release, Job_id}
     end.
 
 % Dispara los 4 requests seguidos al socket en paralelo
@@ -158,6 +161,7 @@ disparar_rafaga(Maps_list, Socket, Cantidad, HandlersMap) ->
 
         Cantidad ->
             Comando = armar_comando(Maps_list),
+            io:format("Enviando: ~s~n", [Comando]),
             case Comando of
                 "" -> 
                     disparar_rafaga(Maps_list, Socket, Cantidad - 1, HandlersMap);
@@ -178,10 +182,15 @@ registrar_log(JobId, Estado, Detalle) ->
     % Abre el archivo en modo append (escribir al final)
     file:write_file("planificador.log", LogTexto, [append]).
 
+% Envía GET_NODES al agente C y recibe la lista de nodos
 get_nodes(Socket) ->
     gen_tcp:send(Socket, ?GET_NODES),
-    
-    case gen_tcp:recv(Socket, 0, 5000) of
+    get_nodes_recv(Socket).
+
+% Si se recibe un mensaje que no sea el de los nodos,
+% se evita enviar el GET_NODES otra vez
+get_nodes_recv(Socket) ->
+    case gen_tcp:recv(Socket, 0) of
         {ok, "NODES " ++ Data} ->
             Data_listed = string:split(string:trim(Data), ";", all), 
             
@@ -199,11 +208,10 @@ get_nodes(Socket) ->
         % del agente C, puede que la recibamos estando acá. Ignoramos el mensaje
         {ok, Mensaje} ->
             io:format("Mensaje tardío ignorado: ~p ~n", [Mensaje]),
-            get_nodes(Socket);
+            get_nodes_recv(Socket);
 
         {error, Reason} ->
             io:format("Error: No se pudo recibir la información sobre los nodos: ~p ~n", [Reason]),
-            gen_tcp:close(Socket),
             []
     end.
 
@@ -218,67 +226,76 @@ masterloop(Maps_list, Socket, HandlersMap) ->
             _ -> Maps_list
         end,
 
-    % Y luego, mandamos otra
-    MapConJobs = 
-        case maps:size(HandlersMap) of
-            0 -> 
-                sleep(1000 + rand:uniform(2000)), % Pausa para no saturar al Agente
-                disparar_rafaga(NuevoMapsList, Socket, ?RAFAGA, HandlersMap);
-            _ -> 
-                HandlersMap
-        end,
+    case NuevoMapsList of
+        
+        % Si la lista está vacía, estamos en un caso de error
+        % o de ausencia de nodos. Terminamos el programa
+        [] -> io:format("Cerrando conexión y terminando programa...~n");
 
-    % Primero vaciamos el buzón de mensajes internos de Erlang
-    receive
-        {release, JobIdToRelease} ->
-            gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(JobIdToRelease) ++ "\n"),
-            % Sacamos el Job del mapa para que maps:size() eventualmente llegue a cero
-            CleanMapInterno = maps:remove(JobIdToRelease, MapConJobs),
-            masterloop(NuevoMapsList, Socket, CleanMapInterno)
-    after 0 -> 
-        % Si no hay liberaciones internas, escuchamos lo que llega de la red (Agente C)
-        case gen_tcp:recv(Socket, 0, 5000) of
-            {ok, LineaConSalto} ->
-                % Removemos el \n de la línea
-                Linea = string:trim(LineaConSalto, trailing, "\n"),
-                
-                {TipoMensaje, IdCrudo} = 
-                    case Linea of
-                        "JOB_GRANTED " ++ Resto -> {granted, Resto};
-                        "JOB_DENIED " ++ Resto  -> {denied, Resto};
-                        "JOB_TIMEOUT " ++ Resto -> {timeout, Resto};
-                        _                       -> {desconocido, ""}
-                    end,
+        _ ->
+            % Si la lista no está vacía, mandamos otra ráfaga
+            MapConJobs = 
+                case maps:size(HandlersMap) of
+                    0 -> 
+                        sleep(1000 + rand:uniform(2000)), % Pausa para no saturar al Agente
+                        disparar_rafaga(NuevoMapsList, Socket, ?RAFAGA, HandlersMap);
+                    _ -> 
+                        HandlersMap
+                end,
 
-                case TipoMensaje of
-                    desconocido ->
-                        masterloop(NuevoMapsList, Socket, MapConJobs);
-                    _ ->
-                        JobIdRecibido = list_to_integer(string:trim(IdCrudo)),
-                        case maps:find(JobIdRecibido, MapConJobs) of
-                            {ok, Destinatario} ->
-                                Destinatario ! TipoMensaje,
+            % Primero vaciamos el buzón de mensajes internos de Erlang
+            receive
+                {release, JobIdToRelease} ->
+                    gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(JobIdToRelease) ++ "\n"),
+                    % Sacamos el Job del mapa para que maps:size() eventualmente llegue a cero
+                    CleanMapInterno = maps:remove(JobIdToRelease, MapConJobs),
+                    masterloop(NuevoMapsList, Socket, CleanMapInterno)
+            after 0 -> 
+                % Si no hay liberaciones internas, escuchamos lo que llega de la red (Agente C)
+                case gen_tcp:recv(Socket, 0, 5000) of
+                    {ok, LineaConSalto} ->
+                        % Removemos el \n de la línea
+                        Linea = string:trim(LineaConSalto, trailing, "\n"),
 
-                                % Sección de registro en archivo log
-                                case TipoMensaje of
-                                    granted -> registrar_log(JobIdRecibido, "OTORGADO", "Recursos reservados correctamente.");
-                                    denied  -> registrar_log(JobIdRecibido, "DENEGADO", "Fallo en la reserva. Nodos saturados.");
-                                    timeout -> registrar_log(JobIdRecibido, "EXPIRADO", "Tiempo de espera agotado.")
-                                end,
+                        {TipoMensaje, IdCrudo} = 
+                            case Linea of
+                                "JOB_GRANTED " ++ Resto -> {granted, Resto};
+                                "JOB_DENIED " ++ Resto  -> {denied, Resto};
+                                "JOB_TIMEOUT " ++ Resto -> {timeout, Resto};
+                                _                       -> {desconocido, ""}
+                            end,
 
+                        case TipoMensaje of
+                            desconocido ->
                                 masterloop(NuevoMapsList, Socket, MapConJobs);
-                            error ->
-                                masterloop(NuevoMapsList, Socket, MapConJobs)
-                        end
-                end;
+                            _ ->
+                                JobIdRecibido = list_to_integer(string:trim(IdCrudo)),
+                                case maps:find(JobIdRecibido, MapConJobs) of
+                                    {ok, Destinatario} ->
+                                        Destinatario ! TipoMensaje,
 
-            {error, timeout} ->
-                masterloop(NuevoMapsList, Socket, MapConJobs);
-            
-            {error, Reason} ->
-                io:format("Error crítico con el Agente C: ~p~n", [Reason])
-        end
+                                        % Sección de registro en archivo log
+                                        case TipoMensaje of
+                                            granted -> registrar_log(JobIdRecibido, "OTORGADO", "Recursos reservados correctamente.");
+                                            denied  -> registrar_log(JobIdRecibido, "DENEGADO", "Fallo en la reserva. Nodos saturados.");
+                                            timeout -> registrar_log(JobIdRecibido, "EXPIRADO", "Tiempo de espera agotado.")
+                                        end,
+
+                                        masterloop(NuevoMapsList, Socket, MapConJobs);
+                                    error ->
+                                        masterloop(NuevoMapsList, Socket, MapConJobs)
+                                end
+                        end;
+                    
+                    {error, timeout} ->
+                        masterloop(NuevoMapsList, Socket, MapConJobs);
+                    
+                    {error, Reason} ->
+                        io:format("Error crítico con el Agente C: ~p~n", [Reason])
+                end
+            end
     end.
+
 % Función para iniciar el cliente de Erlang
 start() ->
     rand:seed(exsp), % Similar a srand(time(NULL)) en C
@@ -294,7 +311,6 @@ start() ->
             io:format("Entrando a masterloop...~n"),
             masterloop([], Socket, #{}),
             gen_tcp:close(Socket);
-            
             
         {error, Reason} ->
             io:format("Conexión fallida: ~p~n", [Reason])
