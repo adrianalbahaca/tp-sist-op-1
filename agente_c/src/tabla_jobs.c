@@ -433,10 +433,13 @@ Job *tabla_jobs_extract_by_remote_conn(TablaJobs *j, connection_t *conn)
 
             // Paso 2: chequear si con esto el job quedó "vacío"
             bool sin_confirmadas = (curr->confirmadas == NULL);
-            bool sin_pendientes_de_esta_conn = true; // ya cubierto por la lógica existente de 'pendientes'
 
             // (la lógica existente de 'pendientes' con esta conn sigue igual que antes)
             bool afectado_por_pendientes = false;
+
+            if (curr->conn == conn)
+                afectado_por_pendientes = true;
+            
             OutRequest *out = curr->pendientes;
             while (out != NULL)
             {
@@ -487,7 +490,8 @@ void tabla_jobs_cambio_alloc(TablaJobs *j, int job_id, connection_t *conn, resou
         return;
     }
 
-    /* Un Job puede tener varias Allocations LOCAL con la misma conn (una por
+    /* 
+    * Un Job puede tener varias Allocations LOCAL con la misma conn (una por
     * tipo de recurso: cpu, mem, gpu). Hace falta filtrar también por tipo de
     * recurso, si no, siempre se actualiza la primera que aparece en la lista
     * y las demás quedan con result=RM_QUEUED para siempre, bloqueando el
