@@ -233,6 +233,12 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
     return;
 }
 
+void print_manager() {
+    printf("========= STATUS DEL MANAGER =========\n");
+    printf("CPU: total: %d, disp.:%d | MEM: total: %d, disp.:%d | GPU: total: %d, disp.: %d \n", manager.recursos[RESOURCE_CPU].total_amount, manager.recursos[RESOURCE_CPU].available_amount, manager.recursos[RESOURCE_MEM].total_amount, manager.recursos[RESOURCE_MEM].available_amount, manager.recursos[RESOURCE_GPU].total_amount, manager.recursos[RESOURCE_GPU].available_amount);
+    printf("=======================================\n");
+}
+
 /**
  * ======================================================================================
  * Funciones de Resource Manager
@@ -739,6 +745,8 @@ void process_message(connection_t *conn, char *msg)
     {
         fprintf(stderr, "Comando inválido: %s\n", msg);
     }
+
+    print_manager();
 
     return;
 }
