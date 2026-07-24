@@ -142,6 +142,7 @@ job_handler(Job_id) ->
             io:format("Job ~p (Timeout). Abortando...~n", [Job_id])
         after 30000 ->
             % Paso algo raro, demasiado tiempo esperando
+            registrar_log(Job_id, "EXPIRADO (LOCAL)", "Tiempo de espera agotado."),
             io:format("Job ~p (Timeout). Abortando...~n", [Job_id])
     end,
     
@@ -246,6 +247,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
             receive
                 {release, JobIdToRelease} ->
                     gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(JobIdToRelease) ++ "\n"),
+                    registrar_log(JobIdToRelease, "RELEASE", "Liberación de recursos solicitada."),
                     % Sacamos el Job del mapa para que maps:size() eventualmente llegue a cero
                     CleanMapInterno = maps:remove(JobIdToRelease, MapConJobs),
                     masterloop(NuevoMapsList, Socket, CleanMapInterno)
