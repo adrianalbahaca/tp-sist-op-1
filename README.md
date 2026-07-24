@@ -33,53 +33,96 @@ Este proyecto implementa un **middleware distribuido** para la gestión de recur
 - **Para el Agente C**
 GCC: Versión 9 o superior
 
-Bibliotecas: pthread, librerías estándar de C
+- Bibliotecas: pthread, librerías estándar de C
 
-Sistema operativo: Distribución de Linux (con soporte para epoll)
+- Sistema operativo: Distribución de Linux (con soporte para epoll)
 
 - **Para el Planificador Erlang**
 Erlang/OTP: Versión 24 o superior
 
 ---
 
-### Compilacion 
+### Compilación 
 ```sh
 $ git clone https://github.com/adrianalbahaca/tp-sist-op-1/tree/main
 $ make all
 ```
 
-## Ejecucion 
-para que los nodos puedan descubrirse entre si, debe usarse
+## Ejecución 
+Para que los nodos puedan descubrirse entre si, debe usarse
 la IP obtenible con: hostname -I
 
-- # Parametros de ejecucion
+# Parámetros de ejecucion
 
-- direccion IP del nodo (hostname -I)
-- puerto TCP para comunicaciones 
-- cantidad de CPUs disponibles
-- cantidad de memoria en MB
-- cantidad de GPUs disponibles
+- Direccion IP del nodo (hostname -I)
+- Puerto TCP para comunicaciones 
+- Cantidad de CPUs disponibles
+- Cantidad de memoria en MB
+- Cantidad de GPUs disponibles
 
 # Ejecutar agente C - Sintaxis
+```
 make run-c IP=<IP_PUBLICA> PORT=<PUERTO> CPU=<CANTIDAD_CPU> MEM=<CANTIDAD_MEM> GPU=<CANTIDAD_GPU>
+```
 
 # Salida Esperada del agente C
-[RX] De ERLANG LOCAL (fd 5) -> GET_NODES
-[TX] A ERLANG LOCAL (fd 5) -> NODES 192.168.1.50:8000:cpu:8:mem:16384:gpu:2;
-[RX] De ERLANG LOCAL (fd 5) -> JOB_REQUEST 1 @192.168.1.50:cpu:2:mem:1024:gpu:0
-[TX] A AGENTE REMOTO 192.168.1.51 (fd 7) -> RESERVE 1 cpu 2
-[TX] DESDE AGENTE REMOTO 192.168.1.51 (fd 7) -> GRANTED 1
-[TX] A AGENTE REMOTO 192.168.1.51 (fd 7) -> RESERVE 1 mem 1024
-[TX] DESDE AGENTE REMOTO 192.168.1.51 (fd 7) -> GRANTED 1 
-[TX] A ERLANG LOCAL 192.168.1.51 (fd 7) -> JOB_GRANTED 1
+
+```
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 192.168.0.14:8000:cpu:4:mem:8192:gpu:1
+========= STATUS DEL MANAGER =========
+CPU: total: 4, disp.:4 | MEM: total: 8192, disp.:8192 | GPU: total: 1, disp.: 1 
+=======================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 9230 @192.168.0.14:cpu:1:mem:331:gpu:1
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 9230
+========= STATUS DEL MANAGER =========
+CPU: total: 4, disp.:3 | MEM: total: 8192, disp.:7861 | GPU: total: 1, disp.: 0 
+=======================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_REQUEST 17422 @192.168.0.14:mem:507:gpu:1
+[QUEUE]: [job_id: 17422, amount: 1, type: LOCAL -> NULL]
+========= STATUS DEL MANAGER =========
+CPU: total: 4, disp.:3 | MEM: total: 8192, disp.:7354 | GPU: total: 1, disp.: 0 
+=======================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 9230
+[QUEUE]: [ NULL]
+[DEQUEUE] Job 17422 desencolado (tipo 2, amount 1, available_restante 0)
+[TX] A ERLANG LOCAL (fd 7) -> JOB_GRANTED 17422
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=7685)
+[RELEASE] tipo 0: cola vacía, nada para desencolar (available=4)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+========= STATUS DEL MANAGER =========
+CPU: total: 4, disp.:4 | MEM: total: 8192, disp.:7685 | GPU: total: 1, disp.: 0 
+=======================================
+[RX] De ERLANG LOCAL (fd 7) -> JOB_RELEASE 17422
+[RELEASE] tipo 2: cola vacía, nada para desencolar (available=1)
+[RELEASE] tipo 1: cola vacía, nada para desencolar (available=8192)
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+========= STATUS DEL MANAGER =========
+CPU: total: 4, disp.:4 | MEM: total: 8192, disp.:8192 | GPU: total: 1, disp.: 1 
+=======================================
+[RX] De ERLANG LOCAL (fd 7) -> GET_NODES
+[TX] A ERLANG LOCAL (fd 7) -> NODES 192.168.0.14:8000:cpu:4:mem:8192:gpu:1
+========= STATUS DEL MANAGER =========
+CPU: total: 4, disp.:4 | MEM: total: 8192, disp.:8192 | GPU: total: 1, disp.: 1 
+=======================================
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
+[QUEUE]: [ NULL]
 ...
+```
+# Ejecutar Planificador Erlang - Sintaxis
+El planificador Erlang debe ejecutarse mientras el agente C está corriendo
 
-# Ejecutar Planificador erlang - Sintaxis
-el planificador Erlang debe ejecutarse despues de que el agente C este corriendo
-
+```
 make run-erl
+```
 
 # Salida Esperada del planificador Erlang
+```
 Conectado al agente C en el puerto 8000
 Entrando a masterloop...
 Job 1 esperando asignación...
@@ -93,8 +136,10 @@ Job 4 esperando asignación...
 Job 3 trabajando...
 Job 4 trabajando... 
 ...
+```
 
 ## Limpieza
-para eliminar los binarios compilados
-
+Para eliminar los binarios compilados
+```
 make clean
+```
