@@ -182,7 +182,7 @@ void release_resource(resource_t tipo, int amount, bool take_lock) {
     if (take_lock) pthread_mutex_lock(&manager.tabla.lock);
     pthread_mutex_lock(&manager.recursos[tipo].mutex);
 
-    if (manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
+    if (amount >= 0 && manager.recursos[tipo].available_amount + amount <= manager.recursos[tipo].total_amount)
         manager.recursos[tipo].available_amount += amount;
     else 
     {
