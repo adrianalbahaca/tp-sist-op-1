@@ -244,6 +244,7 @@ masterloop(Maps_list, Socket, HandlersMap) ->
                 end,
 
             % Primero vaciamos el buzón de mensajes internos de Erlang
+            % Esto espera de cualquier proceso llamado con job_handler
             receive
                 {release, JobIdToRelease} ->
                     gen_tcp:send(Socket, "JOB_RELEASE " ++ integer_to_list(JobIdToRelease) ++ "\n"),
